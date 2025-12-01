@@ -1,0 +1,130 @@
+# Python 文档（okx_py）
+
+基于 PyO3 对 `okx-rest` 与 `okx-ws` 的封装，接口与官方 OKX 文档路径一一对应（参见 https://www.okx.com/docs-v5/）。本节列出公开的 Python 类与方法，全部源自代码，无臆测。
+
+## 安装
+本地开发（推荐使用 `uv` + `maturin`，Python 3.9+）：
+```bash
+just py-setup      # 创建 .venv 并安装依赖
+just py-build      # maturin develop 安装 okx-py
+```
+PyPI 发布准备见 `docs/zh/release.md`。
+
+## 导出的核心类型
+- `Credentials(api_key, secret_key, passphrase)`：API 密钥。
+- `Config(credentials, simulated=False, timeout_secs=30, proxy_url=None, rest_url=None, ws_public_url=None, ws_private_url=None)`：客户端配置，底层对应 `okx-core::Config`。
+- 业务类型均来自 Rust `okx-core::types`，经 PyO3 转换后为 Python 对象（如 `Balance`, `Position`, `Order`, `Ticker` 等），字段名保持官方响应命名（camelCase）。
+
+## 同步 REST 客户端 `OkxClient`
+来源：`crates/okx-py/src/client.rs`。所有方法返回 Python 对象/字典列表，与官方 REST 路径一致：
+- `get_balance(ccy=None)` → `/api/v5/account/balance`
+- `get_positions(inst_type=None, inst_id=None)` → `/api/v5/account/positions`
+- `place_order(inst_id, td_mode, side, ord_type, sz, px=None, cl_ord_id=None)` → `/api/v5/trade/order`
+- `cancel_order(inst_id, ord_id=None, cl_ord_id=None)` → `/api/v5/trade/cancel-order`
+- `get_order(inst_id, ord_id=None, cl_ord_id=None)` → `/api/v5/trade/order`
+- `get_orders_pending(inst_type=None, inst_id=None)` → `/api/v5/trade/orders-pending`
+- 公共行情：
+  - `get_ticker(inst_id)` → `/api/v5/market/ticker`
+  - `get_tickers(inst_type)` → `/api/v5/market/tickers`
+  - `get_instruments(inst_type, inst_id=None)` → `/api/v5/public/instruments`
+- 公共服务：`get_system_time()` → `/api/v5/public/system-time`
+
+## 异步 REST 客户端 `AsyncOkxClient`
+来源：`crates/okx-py/src/async_client.rs`。方法集合与 `OkxClient` 对齐，返回 `await` 后的结果：
+- `get_balance`, `get_positions`, `place_order`, `cancel_order`, `get_order`, `get_orders_pending`
+- 公共行情：`get_ticker`, `get_tickers`, `get_instruments`
+- 公共服务：`get_system_time`
+
+## 覆盖范围与缺失
+- 已暴露（REST）：账户余额、持仓、下单/撤单/查单、待成交、单/多 ticker、合约列表、服务器时间。
+- 未暴露（REST）：账户配置、杠杆/保证金工具、手续费率、订单改价/批量、策略委托、资金（划转/充值/提现等）、资金费率/标记价格等；如需，可参照 `okx-rest` 对应请求结构扩展 PyO3 绑定。
+- WebSocket：公共/私有频道订阅已暴露，支持自动重连；如需补充更多频道参数，可在 `ws_client.rs` 中扩展。
+
+## REST 已暴露方法速查（官方路径）
+| 用途 | 官方路径 | Python 调用 |
+| ---- | -------- | ----------- |
+| 账户余额 | `GET /api/v5/account/balance` | `client.get_balance(ccy=None)` / `await aclient.get_balance()` |
+| 持仓信息 | `GET /api/v5/account/positions` | `client.get_positions(inst_type=None, inst_id=None)` / 异步同名 |
+| 下单 | `POST /api/v5/trade/order` | `client.place_order(inst_id, td_mode, side, ord_type, sz, px=None, cl_ord_id=None)` / 异步同名 |
+| 撤单 | `POST /api/v5/trade/cancel-order` | `client.cancel_order(inst_id, ord_id=None, cl_ord_id=None)` / 异步同名 |
+| 查单 | `GET /api/v5/trade/order` | `client.get_order(inst_id, ord_id=None, cl_ord_id=None)` / 异步同名 |
+| 待成交列表 | `GET /api/v5/trade/orders-pending` | `client.get_orders_pending(inst_type=None, inst_id=None)` / 异步同名 |
+| 单一 ticker | `GET /api/v5/market/ticker` | `client.get_ticker(inst_id)` / 异步同名 |
+| 全部 ticker（按类型） | `GET /api/v5/market/tickers` | `client.get_tickers(inst_type)` / 异步同名 |
+| 合约/币对列表 | `GET /api/v5/public/instruments` | `client.get_instruments(inst_type, inst_id=None)` / 异步同名 |
+| 服务器时间 | `GET /api/v5/public/system-time` | `client.get_system_time()` / 异步同名 |
+
+## REST 未暴露但已在 Rust 实现（可扩展绑定）
+- 账户：账户配置、杠杆信息/设置、最大下单量、最大可用、手续费率、持仓模式、风险视图等。
+- 交易：批量下单/撤单、改单、订单历史、成交明细、策略委托全套（下单/撤单/查询）、平仓。
+- 资金：资金余额、划转、充值地址/记录、提现/记录、币种列表等。
+- 公共：资金费率/历史、标记价格等。
+
+## WebSocket 客户端 `WsClient`
+来源：`crates/okx-py/src/ws_client.rs`，基于 `ReconnectingWsClient`（自动重连与订阅恢复）。
+- 连接：`await WsClient.connect_public(config, max_reconnect_attempts=None)` / `connect_private(...)`
+- 订阅公共频道：
+  - `subscribe_tickers(inst_id)`（tickers）
+  - `subscribe_orderbook(inst_id)`（books）
+  - `subscribe_trades(inst_id)`（trades）
+  - `subscribe_candles(inst_id, interval="1m")`（1m/5m/15m/1H/4H/1D 对应官方 candle 频道）
+- 订阅私有频道：
+  - `subscribe_account(ccy=None)`（account）
+  - `subscribe_positions(inst_type, inst_id=None)`（positions）
+  - `subscribe_orders(inst_type, inst_id=None)`（orders）
+- 接收消息：`await client.recv()` 返回 dict（type=data/event/pong/unknown）。实现了 `async for msg in client` 迭代。
+- 状态控制：`is_connected()`、`reconnect()`、`close()`、`subscription_count()`。
+
+## WebSocket 已暴露订阅
+| 用途 | 频道 | Python 调用 |
+| ---- | ---- | ----------- |
+| Ticker | `tickers` | `await ws.subscribe_tickers("BTC-USDT")` |
+| 订单簿 | `books` | `await ws.subscribe_orderbook("BTC-USDT")` |
+| 成交 | `trades` | `await ws.subscribe_trades("BTC-USDT")` |
+| K 线 | `candle1m/5m/15m/1H/4H/1D` | `await ws.subscribe_candles("BTC-USDT", interval="1m")` |
+| 私有账户 | `account` | `await ws.subscribe_account(ccy=None)` |
+| 私有持仓 | `positions` | `await ws.subscribe_positions(inst_type, inst_id=None)` |
+| 私有订单 | `orders` | `await ws.subscribe_orders(inst_type, inst_id=None)` |
+
+## WebSocket 未暴露频道（可扩展绑定）
+- 深度精简频道：`books5`、`books50-l2-tbt`、`books-l2-tbt`
+- 指数/资金费率/标记价格：`index-tickers`、`funding-rate`、`mark-price`
+- 策略订单：`orders-algo`
+- 余额与持仓合并：`balance_and_position`
+
+## 常用行情示例（对齐官方 Market Data）
+- 现货单币对价格：`get_ticker("BTC-USDT")` → `GET /api/v5/market/ticker`
+- 永续价格：`get_ticker("BTC-USDT-SWAP")` → `GET /api/v5/market/ticker`
+- 全部现货报价：`get_tickers("SPOT")` → `GET /api/v5/market/tickers`
+- 全部永续报价：`get_tickers("SWAP")` → `GET /api/v5/market/tickers`
+- 订单簿：`get_orderbook("BTC-USDT", depth=5)` → `GET /api/v5/market/books`（如绑定未暴露 depth，可在绑定中补充参数再调用）
+- K 线：`get_candles("BTC-USDT", bar="1m")` → `GET /api/v5/market/candles`
+- 最新成交：`get_trades("BTC-USDT", limit=50)` → `GET /api/v5/market/trades`
+- 指数价格：`get_index_tickers(quote_ccy="USDT", inst_id="BTC-USD")` → `GET /api/v5/market/index-tickers`
+
+## 示例
+- 快速片段（同步）：
+  ```python
+  from okx_py import OkxClient, Config, Credentials
+
+  cfg = Config(Credentials("api_key", "secret_key", "passphrase"), simulated=True)
+  client = OkxClient(cfg)
+  print(client.get_ticker("BTC-USDT"))
+  ```
+- 快速片段（异步）：
+  ```python
+  import asyncio
+  from okx_py import AsyncOkxClient, Config, Credentials
+
+  async def main():
+      cfg = Config(Credentials("api_key", "secret_key", "passphrase"), simulated=True)
+      client = AsyncOkxClient(cfg)
+      ticker, balance = await asyncio.gather(
+          client.get_ticker("BTC-USDT"),
+          client.get_balance(),
+      )
+      print(ticker, balance)
+
+  asyncio.run(main())
+  ```
+- 完整示例：见 `crates/okx-py/examples/`（basic_usage/async_usage/websocket_usage），全部以官方文档路径与代码实现验证。

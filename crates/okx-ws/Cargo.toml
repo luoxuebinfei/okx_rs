@@ -1,0 +1,23 @@
+[package]
+name = "okx-ws"
+version = "0.1.0"
+edition = "2021"
+description = "OKX WebSocket API client"
+readme = "../../README.en.md"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/user/okx_rs"
+keywords = ["okx", "exchange", "api", "websocket", "trading"]
+categories = ["api-bindings", "asynchronous"]
+
+[dependencies]
+okx-core = { path = "../okx-core" }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

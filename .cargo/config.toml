@@ -1,0 +1,3 @@
+[alias]
+# 覆盖率入口：使用 cargo-llvm-cov 生成工作区覆盖率与 lcov 报告（不含 doctest，兼容 stable toolchain）
+coverage = "llvm-cov --workspace --all-features --exclude okx-py --lcov --output-path target/lcov.info"
