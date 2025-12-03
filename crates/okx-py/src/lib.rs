@@ -128,4 +128,95 @@ pub(crate) fn map_values(res: okx_core::Result<Vec<Value>>) -> PyResult<Vec<Py<P
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use okx_core::OkxError;
+    use pyo3::exceptions::{PyRuntimeError, PyValueError};
+    use pyo3::types::{PyDict, PyList};
+    use pyo3::Python;
+    use serde_json::json;
+
+    #[test]
+    fn parse_json_value_handles_optional_inputs() {
+        assert!(parse_json_value(None, "body").unwrap().is_none());
+        assert!(parse_json_value(Some("   "), "body").unwrap().is_none());
+
+        let parsed = parse_json_value(Some(r#"{ "a": 1 }"#), "body")
+            .expect("应解析 JSON")
+            .unwrap();
+        assert_eq!(parsed["a"], 1);
+    }
+
+    #[test]
+    fn parse_json_value_reports_error_for_invalid_json() {
+        let err = parse_json_value(Some("{oops"), "payload").unwrap_err();
+        Python::attach(|py| {
+            assert!(err.is_instance_of::<PyValueError>(py));
+            assert!(
+                err.to_string().contains("payload JSON 解析失败"),
+                "错误信息需包含字段名"
+            );
+        });
+    }
+
+    #[test]
+    fn parse_json_array_covers_none_and_invalid_cases() {
+        assert!(parse_json_array(None, "items").unwrap().is_none());
+        assert!(parse_json_array(Some(""), "items").unwrap().is_none());
+
+        let arr = parse_json_array(Some(r#"["a", 2]"#), "items")
+            .expect("应成功解析数组")
+            .unwrap();
+        assert_eq!(arr.len(), 2);
+
+        let err = parse_json_array(Some("not array"), "items").unwrap_err();
+        Python::attach(|py| assert!(err.is_instance_of::<PyValueError>(py)));
+    }
+
+    #[test]
+    fn values_to_py_list_roundtrips_json_values() {
+        Python::attach(|py| {
+            let values = vec![json!({"k": 1}), json!(["x", 2])];
+            let py_values = values_to_py_list(values).expect("转换应成功");
+            assert_eq!(py_values.len(), 2);
+
+            let first = py_values[0].bind(py).cast::<PyDict>().expect("应为字典");
+            assert_eq!(
+                first
+                    .get_item("k")
+                    .expect("读取 k 失败")
+                    .expect("需包含键")
+                    .extract::<i64>()
+                    .expect("应为整数"),
+                1
+            );
+
+            let second = py_values[1].bind(py).cast::<PyList>().expect("应为列表");
+            assert_eq!(
+                second
+                    .get_item(0)
+                    .expect("读取索引 0 失败")
+                    .extract::<String>()
+                    .unwrap(),
+                "x"
+            );
+            assert_eq!(
+                second
+                    .get_item(1)
+                    .expect("读取索引 1 失败")
+                    .extract::<i64>()
+                    .unwrap(),
+                2
+            );
+        });
+    }
+
+    #[test]
+    fn map_values_converts_errors_to_python_runtime_error() {
+        Python::attach(|py| {
+            let err = map_values(Err(OkxError::Http("boom".into()))).unwrap_err();
+            assert!(err.is_instance_of::<PyRuntimeError>(py));
+            assert!(err.to_string().contains("HTTP error: boom"));
+        });
+    }
+}

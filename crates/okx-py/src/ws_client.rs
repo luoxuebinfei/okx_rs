@@ -138,6 +138,45 @@ impl PyWsClient {
         })
     }
 
+    /// 订阅策略订单频道（私有）。
+    #[pyo3(signature = (inst_type, inst_family=None, inst_id=None))]
+    fn subscribe_orders_algo<'py>(
+        &self,
+        py: Python<'py>,
+        inst_type: String,
+        inst_family: Option<String>,
+        inst_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::OrdersAlgo {
+                inst_type,
+                inst_family,
+                inst_id,
+            };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅余额与持仓合并频道（私有）。
+    fn subscribe_balance_and_position<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::BalanceAndPosition;
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
     /// Subscribe to order book channel.
     ///
     /// Args:
@@ -159,6 +198,60 @@ impl PyWsClient {
         })
     }
 
+    /// 订阅 5 档订单簿。
+    fn subscribe_orderbook5<'py>(
+        &self,
+        py: Python<'py>,
+        inst_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::Books5 { inst_id };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅 50 档 L2 TBT 订单簿。
+    fn subscribe_orderbook50_l2_tbt<'py>(
+        &self,
+        py: Python<'py>,
+        inst_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::Books50L2Tbt { inst_id };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅全量 L2 TBT 订单簿。
+    fn subscribe_orderbook_l2_tbt<'py>(
+        &self,
+        py: Python<'py>,
+        inst_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::BooksL2Tbt { inst_id };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
     /// Subscribe to trades channel.
     ///
     /// Args:
@@ -171,6 +264,60 @@ impl PyWsClient {
         let client = Arc::clone(&self.client);
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             let channel = Channel::Trades { inst_id };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅标记价格频道。
+    fn subscribe_mark_price<'py>(
+        &self,
+        py: Python<'py>,
+        inst_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::MarkPrice { inst_id };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅指数 Ticker 频道。
+    fn subscribe_index_tickers<'py>(
+        &self,
+        py: Python<'py>,
+        inst_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::IndexTickers { inst_id };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅资金费率频道。
+    fn subscribe_funding_rate<'py>(
+        &self,
+        py: Python<'py>,
+        inst_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::FundingRate { inst_id };
             client
                 .lock()
                 .await
@@ -296,6 +443,269 @@ impl PyWsClient {
         })
     }
 
+    /// 订阅高级算法订单频道（私有）。
+    #[pyo3(signature = (inst_type=None, inst_family=None, inst_id=None))]
+    fn subscribe_algo_advance<'py>(
+        &self,
+        py: Python<'py>,
+        inst_type: Option<String>,
+        inst_family: Option<String>,
+        inst_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::AlgoAdvance {
+                inst_type,
+                inst_family,
+                inst_id,
+            };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅 business RFQ 频道（需私有/business 连接）。
+    #[pyo3(signature = (inst_family=None))]
+    fn subscribe_rfqs<'py>(
+        &self,
+        py: Python<'py>,
+        inst_family: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::Rfqs { inst_family };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅 business Quotes 频道（需私有/business 连接）。
+    #[pyo3(signature = (inst_family=None))]
+    fn subscribe_quotes<'py>(
+        &self,
+        py: Python<'py>,
+        inst_family: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::Quotes { inst_family };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅结构化大宗成交（私有）。
+    #[pyo3(signature = (inst_family=None))]
+    fn subscribe_struc_block_trades<'py>(
+        &self,
+        py: Python<'py>,
+        inst_family: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::StrucBlockTrades { inst_family };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅公开结构化大宗成交（公共）。
+    #[pyo3(signature = (inst_family=None))]
+    fn subscribe_public_struc_block_trades<'py>(
+        &self,
+        py: Python<'py>,
+        inst_family: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::PublicStrucBlockTrades { inst_family };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅公开大宗成交（公共）。
+    #[pyo3(signature = (inst_family=None))]
+    fn subscribe_public_block_trades<'py>(
+        &self,
+        py: Python<'py>,
+        inst_family: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::PublicBlockTrades { inst_family };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅 block tickers（公共）。
+    #[pyo3(signature = (inst_family=None))]
+    fn subscribe_block_tickers<'py>(
+        &self,
+        py: Python<'py>,
+        inst_family: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::BlockTickers { inst_family };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅现货网格订单（私有）。
+    #[pyo3(signature = (algo_id=None, inst_id=None))]
+    fn subscribe_grid_orders_spot<'py>(
+        &self,
+        py: Python<'py>,
+        algo_id: Option<String>,
+        inst_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::GridOrdersSpot { algo_id, inst_id };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅合约网格订单（私有）。
+    #[pyo3(signature = (algo_id=None, inst_id=None))]
+    fn subscribe_grid_orders_contract<'py>(
+        &self,
+        py: Python<'py>,
+        algo_id: Option<String>,
+        inst_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::GridOrdersContract { algo_id, inst_id };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅月亮网格订单（私有）。
+    #[pyo3(signature = (algo_id=None, inst_id=None))]
+    fn subscribe_grid_orders_moon<'py>(
+        &self,
+        py: Python<'py>,
+        algo_id: Option<String>,
+        inst_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::GridOrdersMoon { algo_id, inst_id };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅网格仓位（私有）。
+    #[pyo3(signature = (algo_id=None, inst_type=None, inst_id=None))]
+    fn subscribe_grid_positions<'py>(
+        &self,
+        py: Python<'py>,
+        algo_id: Option<String>,
+        inst_type: Option<String>,
+        inst_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::GridPositions {
+                algo_id,
+                inst_type,
+                inst_id,
+            };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅网格子订单（私有）。
+    #[pyo3(signature = (algo_id=None, inst_id=None))]
+    fn subscribe_grid_sub_orders<'py>(
+        &self,
+        py: Python<'py>,
+        algo_id: Option<String>,
+        inst_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::GridSubOrders { algo_id, inst_id };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 订阅定投订单（私有）。
+    #[pyo3(signature = (algo_id=None))]
+    fn subscribe_algo_recurring_buy<'py>(
+        &self,
+        py: Python<'py>,
+        algo_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let channel = Channel::AlgoRecurringBuy { algo_id };
+            client
+                .lock()
+                .await
+                .subscribe(vec![channel])
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
     /// Receive the next message from the WebSocket.
     ///
     /// Returns:
@@ -409,4 +819,163 @@ fn ws_message_to_py(py: Python<'_>, msg: WsMessage) -> PyResult<Py<PyAny>> {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use okx_ws::WsEvent;
+    use pyo3::types::{PyDict, PyList};
+    use pyo3::Python;
+    use serde_json::{json, Value};
+
+    #[test]
+    fn ws_message_to_py_maps_data_branch() {
+        Python::attach(|py| {
+            let arg_value = json!({"channel":"tickers","instId":"BTC-USDT"});
+            let msg = WsMessage::Data {
+                channel: "tickers".to_string(),
+                arg: arg_value.clone(),
+                data: vec![json!({"px":"1.1"}), json!(3)],
+            };
+
+            let obj = ws_message_to_py(py, msg).expect("转换成功");
+            let dict = obj.bind(py).cast::<PyDict>().expect("应为字典");
+
+            let msg_type: String = dict
+                .get_item("type")
+                .expect("读取 type 失败")
+                .expect("需包含 type")
+                .extract()
+                .unwrap();
+            assert_eq!(msg_type, "data");
+            let channel: String = dict
+                .get_item("channel")
+                .expect("读取 channel 失败")
+                .expect("需包含 channel")
+                .extract()
+                .unwrap();
+            assert_eq!(channel, "tickers");
+
+            let arg: String = dict
+                .get_item("arg")
+                .expect("读取 arg 失败")
+                .expect("需包含 arg")
+                .extract()
+                .unwrap();
+            let parsed_arg: Value = serde_json::from_str(&arg).expect("arg 应为 JSON 字符串");
+            assert_eq!(parsed_arg, arg_value);
+
+            let data_obj = dict
+                .get_item("data")
+                .expect("读取 data 失败")
+                .expect("需包含 data");
+            let data = data_obj.cast::<PyList>().expect("data 应为列表");
+            assert_eq!(data.len(), 2);
+            let first: String = data.get_item(0).expect("需有首元素").extract().unwrap();
+            let parsed_first: Value = serde_json::from_str(&first).unwrap();
+            assert_eq!(parsed_first, json!({"px":"1.1"}));
+        });
+    }
+
+    #[test]
+    fn ws_message_to_py_maps_event_branch_with_optionals() {
+        Python::attach(|py| {
+            let msg = WsMessage::Event {
+                event: WsEvent::Error,
+                arg: Some(json!({"channel":"orders"})),
+                code: Some("51000".into()),
+                msg: Some("rejected".into()),
+                conn_id: Some("cid-1".into()),
+            };
+
+            let obj = ws_message_to_py(py, msg).expect("转换成功");
+            let dict = obj.bind(py).cast::<PyDict>().expect("应为字典");
+
+            let msg_type: String = dict
+                .get_item("type")
+                .expect("读取 type 失败")
+                .expect("需包含 type")
+                .extract()
+                .unwrap();
+            assert_eq!(msg_type, "event");
+            let event: String = dict
+                .get_item("event")
+                .expect("读取 event 失败")
+                .expect("需包含 event")
+                .extract()
+                .unwrap();
+            assert_eq!(event, "Error");
+
+            let arg: String = dict
+                .get_item("arg")
+                .expect("读取 arg 失败")
+                .expect("需包含 arg")
+                .extract()
+                .unwrap();
+            let parsed_arg: Value = serde_json::from_str(&arg).unwrap();
+            assert_eq!(parsed_arg, json!({"channel":"orders"}));
+
+            assert_eq!(
+                dict.get_item("code")
+                    .expect("读取 code 失败")
+                    .expect("需包含 code")
+                    .extract::<String>()
+                    .unwrap(),
+                "51000"
+            );
+            assert_eq!(
+                dict.get_item("msg")
+                    .expect("读取 msg 失败")
+                    .expect("需包含 msg")
+                    .extract::<String>()
+                    .unwrap(),
+                "rejected"
+            );
+            assert_eq!(
+                dict.get_item("connId")
+                    .expect("读取 connId 失败")
+                    .expect("需包含 connId")
+                    .extract::<String>()
+                    .unwrap(),
+                "cid-1"
+            );
+        });
+    }
+
+    #[test]
+    fn ws_message_to_py_maps_pong_and_unknown() {
+        Python::attach(|py| {
+            let pong = ws_message_to_py(py, WsMessage::Pong).expect("转换成功");
+            let pong_dict = pong.bind(py).cast::<PyDict>().expect("应为字典");
+            assert_eq!(
+                pong_dict
+                    .get_item("type")
+                    .expect("读取 type 失败")
+                    .expect("需包含 type")
+                    .extract::<String>()
+                    .unwrap(),
+                "pong"
+            );
+
+            let raw = "weird payload";
+            let unknown = ws_message_to_py(py, WsMessage::Unknown(raw.into())).expect("转换成功");
+            let unknown_dict = unknown.bind(py).cast::<PyDict>().expect("应为字典");
+            assert_eq!(
+                unknown_dict
+                    .get_item("type")
+                    .expect("读取 type 失败")
+                    .expect("需包含 type")
+                    .extract::<String>()
+                    .unwrap(),
+                "unknown"
+            );
+            assert_eq!(
+                unknown_dict
+                    .get_item("raw")
+                    .expect("读取 raw 失败")
+                    .expect("需包含 raw")
+                    .extract::<String>()
+                    .unwrap(),
+                raw
+            );
+        });
+    }
+}

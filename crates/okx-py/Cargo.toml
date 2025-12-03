@@ -12,6 +12,10 @@ categories = ["api-bindings"]
 [lib]
 name = "okx_py"
 crate-type = ["cdylib"]
+# 禁用 Rust 测试（Python 测试通过 pytest 运行）
+test = false
+bench = false
+doctest = false
 
 [dependencies]
 okx-core = { path = "../okx-core" }

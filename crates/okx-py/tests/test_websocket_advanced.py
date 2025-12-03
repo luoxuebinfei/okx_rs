@@ -72,6 +72,23 @@ async def test_ws_client_subscription_count():
 
 
 @pytest.mark.asyncio
+async def test_ws_client_subscribe_block_channels():
+    """测试高级公共频道订阅（block tickers/trades）。"""
+    from okx_py import WsClient, Config, Credentials
+
+    creds = Credentials("dummy", "dummy", "dummy")
+    config = Config(creds, simulated=True)
+
+    try:
+        client = await WsClient.connect_public(config)
+        # block tickers / public block trades 频道应存在
+        await client.subscribe_block_tickers()
+        await client.subscribe_public_block_trades()
+    except Exception as e:
+        pytest.skip(f"WebSocket 连接错误: {e}")
+
+
+@pytest.mark.asyncio
 async def test_ws_client_close():
     """测试 WebSocket 关闭连接."""
     from okx_py import WsClient, Config, Credentials

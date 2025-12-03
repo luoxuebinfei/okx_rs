@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 
+use okx_core::types::EstimateQuoteParams;
 use okx_core::types::{
     AmendOrderRequest, AttachAlgoOrdRequest, CancelAlgoOrderRequest, CancelOrderRequest,
     PlaceAlgoOrderRequest,
@@ -9,17 +10,31 @@ use okx_core::{
     Config, Credentials,
 };
 use okx_rest::api::account::{
-    self, GetFeeRatesParams, GetLeverageInfoParams, GetMaxAvailSizeParams, GetMaxSizeParams,
-    GetPositionsParams, SetLeverageRequest,
+    self, AdjustmentMarginRequest, GetFeeRatesParams, GetLeverageInfoParams, GetMaxAvailSizeParams,
+    GetMaxSizeParams, GetPositionsParams, SetAutoLoanRequest, SetLeverageRequest,
+    SetRiskOffsetTypeRequest,
 };
+use okx_rest::api::block_rfq;
+use okx_rest::api::broker;
+use okx_rest::api::convert;
+use okx_rest::api::copy_trading;
+use okx_rest::api::finance;
 use okx_rest::api::funding::{self, GetDepositHistoryParams, GetWithdrawalHistoryParams};
+use okx_rest::api::grid;
+use okx_rest::api::status;
+use okx_rest::api::subaccount::{self, SubaccountTransferRequest};
 use okx_rest::api::trade::{
     ClosePositionRequest, GetAlgoOrdersHistoryParams, GetAlgoOrdersParams, GetFillsParams,
     GetOrderParams, GetOrdersHistoryParams, GetOrdersPendingParams,
 };
-use okx_rest::api::{funding::endpoints as funding_ep, trade};
-use okx_rest::{AccountApi, FundingApi, OkxError, OkxRestClient, TradeApi};
-use serde_json::to_value;
+use okx_rest::api::trading_data;
+use okx_rest::api::{funding::endpoints as funding_ep, spread, trade};
+use okx_rest::{
+    AccountApi, BlockRfqApi, BrokerApi, ConvertApi, CopyTradingApi, FinanceApi, FundingApi,
+    GridApi, OkxError, OkxRestClient, SpreadApi, StatusApi, SubaccountApi, TradeApi,
+    TradingDataApi,
+};
+use serde_json::{json, to_value};
 
 fn dummy_client() -> OkxRestClient {
     let creds = Credentials::new("key", "secret", "pass");
@@ -73,6 +88,53 @@ async fn account_methods_build_params_and_return_http_error() {
 
     let msg = expect_http_error(client.get_account_config().await.unwrap_err());
     assert!(msg.contains(account::endpoints::CONFIG));
+
+    let msg = expect_http_error(client.get_positions_history(None).await.unwrap_err());
+    assert!(msg.contains(account::endpoints::POSITIONS_HISTORY));
+
+    let msg = expect_http_error(client.get_max_withdrawal(None).await.unwrap_err());
+    assert!(msg.contains(account::endpoints::MAX_WITHDRAWAL));
+
+    let msg = expect_http_error(client.get_account_bills(None).await.unwrap_err());
+    assert!(msg.contains(account::endpoints::BILLS));
+
+    let msg = expect_http_error(client.get_borrow_repay_history(None).await.unwrap_err());
+    assert!(msg.contains(account::endpoints::BORROW_REPAY_HISTORY));
+
+    let msg = expect_http_error(client.spot_borrow_repay_history(None).await.unwrap_err());
+    assert!(msg.contains(account::endpoints::SPOT_BORROW_REPAY_HISTORY));
+
+    let msg = expect_http_error(client.get_interest_rate(None).await.unwrap_err());
+    assert!(msg.contains(account::endpoints::INTEREST_RATE));
+}
+
+#[tokio::test]
+async fn account_margin_and_risk_settings_paths() {
+    let client = dummy_client();
+
+    let adj = AdjustmentMarginRequest {
+        inst_id: "BTC-USDT-SWAP".into(),
+        pos_side: "net".into(),
+        r#type: "add".into(),
+        amt: "1".into(),
+        loan_trans: Some(false),
+    };
+    let body = to_value(&adj).expect("序列化 adjustment_margin 请求失败");
+    assert_eq!(body["instId"], "BTC-USDT-SWAP");
+    let msg = expect_http_error(client.adjustment_margin(adj).await.unwrap_err());
+    assert!(msg.contains(account::endpoints::ADJUSTMENT_MARGIN));
+
+    let risk = SetRiskOffsetTypeRequest { r#type: "1".into() };
+    let msg = expect_http_error(client.set_risk_offset_type(risk).await.unwrap_err());
+    assert!(msg.contains(account::endpoints::SET_RISK_OFFSET_TYPE));
+
+    let auto = SetAutoLoanRequest {
+        auto_loan: Some("true".into()),
+    };
+    let body = to_value(&auto).expect("序列化 set_auto_loan 请求失败");
+    assert_eq!(body["autoLoan"], "true");
+    let msg = expect_http_error(client.set_auto_loan(auto).await.unwrap_err());
+    assert!(msg.contains(account::endpoints::SET_AUTO_LOAN));
 }
 
 #[tokio::test]
@@ -100,6 +162,48 @@ async fn funding_methods_serialize_and_fail_fast() {
     assert_eq!(body["from"], "6");
     let msg = expect_http_error(client.funds_transfer(transfer_req).await.unwrap_err());
     assert!(msg.contains(funding::endpoints::TRANSFER));
+
+    let msg = expect_http_error(client.get_deposit_address("USDT").await.unwrap_err());
+    assert!(msg.contains(funding::endpoints::DEPOSIT_ADDRESS));
+
+    let deposit_params = GetDepositHistoryParams::default();
+    let msg = expect_http_error(
+        client
+            .get_deposit_history(Some(deposit_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(funding::endpoints::DEPOSIT_HISTORY));
+
+    let withdraw_params = GetWithdrawalHistoryParams::default();
+    let msg = expect_http_error(
+        client
+            .get_withdrawal_history(Some(withdraw_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(funding::endpoints::WITHDRAWAL_HISTORY));
+
+    let msg = expect_http_error(client.get_non_tradable_assets(None).await.unwrap_err());
+    assert!(msg.contains(funding::endpoints::NON_TRADABLE_ASSETS));
+
+    let msg = expect_http_error(client.get_asset_valuation(None).await.unwrap_err());
+    assert!(msg.contains(funding::endpoints::ASSET_VALUATION));
+
+    let msg = expect_http_error(client.get_funding_bills(None).await.unwrap_err());
+    assert!(msg.contains(funding::endpoints::BILLS));
+
+    let msg = expect_http_error(client.get_lending_history(None).await.unwrap_err());
+    assert!(msg.contains(funding::endpoints::LENDING_HISTORY));
+
+    let msg = expect_http_error(client.get_lending_rate_history(None).await.unwrap_err());
+    assert!(msg.contains(funding::endpoints::LENDING_RATE_HISTORY));
+
+    let msg = expect_http_error(client.get_lending_rate_summary(None).await.unwrap_err());
+    assert!(msg.contains(funding::endpoints::LENDING_RATE_SUMMARY));
+
+    let msg = expect_http_error(client.get_saving_balance(None).await.unwrap_err());
+    assert!(msg.contains(funding::endpoints::SAVING_BALANCE));
 }
 
 #[tokio::test]
@@ -536,4 +640,592 @@ async fn funding_more_paths_and_requests_are_serialized() {
     assert_eq!(body["dest"], "4");
     let msg = expect_http_error(client.withdrawal(withdraw_req).await.unwrap_err());
     assert!(msg.contains(funding_ep::WITHDRAWAL));
+}
+
+#[tokio::test]
+async fn trade_mass_cancel_and_precheck_paths() {
+    let client = dummy_client();
+
+    let mass_cancel_body = json!({
+        "instType": "SWAP",
+        "instId": "BTC-USDT-SWAP",
+    });
+    let msg = expect_http_error(client.mass_cancel(mass_cancel_body).await.unwrap_err());
+    assert!(msg.contains(trade::endpoints::MASS_CANCEL));
+
+    let cancel_all_after_body = json!({
+        "timeOut": "10"
+    });
+    let msg = expect_http_error(
+        client
+            .cancel_all_after(cancel_all_after_body)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(trade::endpoints::CANCEL_ALL_AFTER));
+
+    let precheck_body = json!({
+        "instId": "BTC-USDT",
+        "tdMode": "cash",
+        "side": "buy",
+        "ordType": "limit",
+        "px": "20000",
+        "sz": "1"
+    });
+    let msg = expect_http_error(client.order_precheck(precheck_body).await.unwrap_err());
+    assert!(msg.contains(trade::endpoints::ORDER_PRECHECK));
+}
+
+#[tokio::test]
+async fn spread_paths_cover_basic_calls() {
+    let client = dummy_client();
+
+    let place = json!({
+        "sprdId": "spread1",
+        "side": "buy",
+        "ordType": "limit",
+        "px": "1",
+        "sz": "1"
+    });
+    let msg = expect_http_error(client.spread_place_order(place).await.unwrap_err());
+    assert!(msg.contains(spread::endpoints::PLACE_ORDER));
+
+    let cancel = json!({ "sprdId": "spread1" });
+    let msg = expect_http_error(client.spread_cancel_order(cancel).await.unwrap_err());
+    assert!(msg.contains(spread::endpoints::CANCEL_ORDER));
+
+    let mass = json!({ "instId": "BTC-USDT-SPRD" });
+    let msg = expect_http_error(client.spread_cancel_all_orders(mass).await.unwrap_err());
+    assert!(msg.contains(spread::endpoints::CANCEL_ALL_ORDERS));
+
+    let details = json!({ "sprdId": "spread1" });
+    let msg = expect_http_error(client.spread_get_order_details(details).await.unwrap_err());
+    assert!(msg.contains(spread::endpoints::ORDER_DETAILS));
+}
+
+#[tokio::test]
+async fn convert_methods_build_params_and_return_http_error() {
+    let client = dummy_client();
+
+    let msg = expect_http_error(client.get_convert_currencies().await.unwrap_err());
+    assert!(msg.contains(convert::endpoints::CONVERT_CURRENCIES));
+
+    let estimate = EstimateQuoteParams {
+        base_ccy: "BTC".into(),
+        quote_ccy: "USDT".into(),
+        side: "sell".into(),
+        rfq_sz: "0.1".into(),
+        rfq_sz_ccy: "BTC".into(),
+        cl_q_req_id: Some("req-1".into()),
+        tag: Some("tag-1".into()),
+    };
+    let body = to_value(&estimate).expect("序列化报价失败");
+    assert_eq!(body["rfqSzCcy"], "BTC");
+    let msg = expect_http_error(client.estimate_convert_quote(estimate).await.unwrap_err());
+    assert!(msg.contains(convert::endpoints::CONVERT_ESTIMATE_QUOTE));
+
+    let trade_req = okx_core::types::ConvertTradeRequest {
+        quote_id: "qid".into(),
+        base_ccy: "BTC".into(),
+        quote_ccy: "USDT".into(),
+        side: "sell".into(),
+        sz: "0.1".into(),
+        sz_ccy: "BTC".into(),
+        cl_t_req_id: None,
+        tag: None,
+    };
+    let msg = expect_http_error(client.convert_trade(trade_req).await.unwrap_err());
+    assert!(msg.contains(convert::endpoints::CONVERT_TRADE));
+
+    let msg = expect_http_error(
+        client
+            .get_easy_convert_history(Some("1"), Some("2"), Some(10))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(convert::endpoints::EASY_CONVERT_HISTORY));
+
+    let msg = expect_http_error(
+        client
+            .get_one_click_repay_history(Some("1"), Some("2"), Some(10))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(convert::endpoints::ONE_CLICK_REPAY_HISTORY));
+}
+
+#[tokio::test]
+async fn system_status_path_builds() {
+    let client = dummy_client();
+    let msg = expect_http_error(client.get_system_status(Some("1")).await.unwrap_err());
+    assert!(msg.contains(status::endpoints::SYSTEM_STATUS));
+}
+
+#[tokio::test]
+async fn subaccount_methods_build_params_and_return_http_error() {
+    let client = dummy_client();
+
+    let msg = expect_http_error(client.get_subaccount_balance("sub1").await.unwrap_err());
+    assert!(msg.contains(subaccount::endpoints::BALANCE));
+
+    let msg = expect_http_error(client.get_subaccount_list(None).await.unwrap_err());
+    assert!(msg.contains(subaccount::endpoints::LIST));
+
+    let transfer = SubaccountTransferRequest {
+        ccy: "USDT".into(),
+        amt: "10".into(),
+        froms: "6".into(),
+        to: "18".into(),
+        from_sub_account: "sub1".into(),
+        to_sub_account: "sub2".into(),
+        loan_trans: Some(false),
+        omit_pos_risk: Some(false),
+    };
+    let body = to_value(&transfer).expect("序列化子账户划转失败");
+    assert_eq!(body["fromSubAccount"], "sub1");
+    let msg = expect_http_error(client.subaccount_transfer(transfer).await.unwrap_err());
+    assert!(msg.contains(subaccount::endpoints::TRANSFER));
+
+    let msg = expect_http_error(client.get_entrust_subaccount_list(None).await.unwrap_err());
+    assert!(msg.contains(subaccount::endpoints::ENTRUST_LIST));
+
+    let msg = expect_http_error(client.get_funding_balance("sub1", None).await.unwrap_err());
+    assert!(msg.contains(subaccount::endpoints::FUNDING_BALANCE));
+
+    let msg = expect_http_error(
+        client
+            .get_affiliate_rebate_info("key123")
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(subaccount::endpoints::AFFILIATE_REBATE));
+}
+
+#[tokio::test]
+async fn rfq_paths_cover_basic_calls() {
+    let client = dummy_client();
+
+    let rfq_body = json!({ "instId": "BTC-USDT" });
+    let msg = expect_http_error(client.create_rfq(rfq_body).await.unwrap_err());
+    assert!(msg.contains(block_rfq::endpoints::CREATE_RFQ));
+
+    let quote_body = json!({ "rfqId": "1", "quoteSide": "buy" });
+    let msg = expect_http_error(client.create_quote(quote_body).await.unwrap_err());
+    assert!(msg.contains(block_rfq::endpoints::CREATE_QUOTE));
+
+    let cancel_quote_body = json!({ "quoteId": "1" });
+    let msg = expect_http_error(client.cancel_quote(cancel_quote_body).await.unwrap_err());
+    assert!(msg.contains(block_rfq::endpoints::CANCEL_QUOTE));
+
+    let mmp_body = json!({ "timeInterval": "1000", "frozenInterval": "1000", "qtyLimit": "1" });
+    let msg = expect_http_error(client.set_mmp_config(mmp_body).await.unwrap_err());
+    assert!(msg.contains(block_rfq::endpoints::SET_MMP));
+
+    let msg = expect_http_error(client.get_mmp_config().await.unwrap_err());
+    assert!(msg.contains(block_rfq::endpoints::GET_MMP_CONFIG));
+
+    let set_marker = json!({"instFamily": "BTC-USD"});
+    let msg = expect_http_error(client.set_marker_instrument(set_marker).await.unwrap_err());
+    assert!(msg.contains(block_rfq::endpoints::SET_MARKER_INSTRUMENT));
+}
+
+#[tokio::test]
+async fn copy_trading_paths_cover_basic_calls() {
+    let client = dummy_client();
+
+    let params = serde_json::json!({"instId": "BTC-USDT"});
+    let msg = expect_http_error(
+        client
+            .get_existing_lead_positions(Some(params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(copy_trading::endpoints::EXISTING_LEAD_POSITIONS));
+
+    let stop_order = serde_json::json!({"subPosId": "1", "tpTriggerPx": "20000"});
+    let msg = expect_http_error(client.place_lead_stop_order(stop_order).await.unwrap_err());
+    assert!(msg.contains(copy_trading::endpoints::PLACE_LEAD_STOP_ORDER));
+
+    let close_pos = serde_json::json!({"subPosId": "1"});
+    let msg = expect_http_error(client.close_lead_position(close_pos).await.unwrap_err());
+    assert!(msg.contains(copy_trading::endpoints::CLOSE_LEAD_POSITION));
+
+    let profit_params = serde_json::json!({"after": "1"});
+    let msg = expect_http_error(
+        client
+            .get_profit_sharing_details(Some(profit_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(copy_trading::endpoints::PROFIT_SHARING_DETAILS));
+
+    let msg = expect_http_error(client.get_total_profit_sharing().await.unwrap_err());
+    assert!(msg.contains(copy_trading::endpoints::TOTAL_PROFIT_SHARING));
+}
+
+#[tokio::test]
+async fn grid_paths_cover_basic_calls() {
+    let client = dummy_client();
+
+    let grid_order = json!({"instId": "BTC-USDT-SWAP", "algoOrderType": "grid", "maxPx": "30000", "minPx": "20000", "gridNum": "5", "runType": "2"});
+    let msg = expect_http_error(client.grid_order_algo(grid_order).await.unwrap_err());
+    assert!(msg.contains(grid::endpoints::GRID_ORDER_ALGO));
+
+    let amend = json!({"algoId": "123", "instId": "BTC-USDT-SWAP"});
+    let msg = expect_http_error(client.grid_amend_order_algo(amend).await.unwrap_err());
+    assert!(msg.contains(grid::endpoints::GRID_AMEND_ORDER_ALGO));
+
+    let stop = json!({"algoId": "123", "instId": "BTC-USDT-SWAP", "stopType": "1"});
+    let msg = expect_http_error(client.grid_stop_order_algo(stop).await.unwrap_err());
+    assert!(msg.contains(grid::endpoints::GRID_STOP_ORDER_ALGO));
+
+    let pending = json!({"algoOrderType": "grid"});
+    let msg = expect_http_error(
+        client
+            .grid_orders_algo_pending(Some(pending))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(grid::endpoints::GRID_ORDERS_ALGO_PENDING));
+
+    let history = json!({"algoOrderType": "grid"});
+    let msg = expect_http_error(
+        client
+            .grid_orders_algo_history(Some(history))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(grid::endpoints::GRID_ORDERS_ALGO_HISTORY));
+
+    let details = json!({"algoOrderType": "grid", "algoId": "123"});
+    let msg = expect_http_error(client.grid_orders_algo_details(details).await.unwrap_err());
+    assert!(msg.contains(grid::endpoints::GRID_ORDERS_ALGO_DETAILS));
+
+    let sub = json!({"algoId": "123", "algoOrderType": "grid"});
+    let msg = expect_http_error(client.grid_sub_orders(sub).await.unwrap_err());
+    assert!(msg.contains(grid::endpoints::GRID_SUB_ORDERS));
+
+    let pos = json!({"algoOrderType": "grid"});
+    let msg = expect_http_error(client.grid_positions(Some(pos)).await.unwrap_err());
+    assert!(msg.contains(grid::endpoints::GRID_POSITIONS));
+
+    let withdraw = json!({"algoId": "123"});
+    let msg = expect_http_error(client.grid_withdraw_income(withdraw).await.unwrap_err());
+    assert!(msg.contains(grid::endpoints::GRID_WITHDRAW_INCOME));
+
+    let compute = json!({"algoId": "123", "type": "add", "amt": "100"});
+    let msg = expect_http_error(
+        client
+            .grid_compute_margin_balance(compute)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(grid::endpoints::GRID_COMPUTE_MARGIN_BALANCE));
+
+    let margin = json!({"algoId": "123", "type": "add", "amt": "100"});
+    let msg = expect_http_error(client.grid_margin_balance(margin).await.unwrap_err());
+    assert!(msg.contains(grid::endpoints::GRID_MARGIN_BALANCE));
+
+    let ai = json!({"algoOrderType": "grid", "instId": "BTC-USDT"});
+    let msg = expect_http_error(client.grid_ai_param(Some(ai)).await.unwrap_err());
+    assert!(msg.contains(grid::endpoints::GRID_AI_PARAM));
+
+    let recur_order = json!({"algoOrderType": "recurring", "ruleType": "1", "baseCcy": "USDT", "quoteCcy": "BTC", "amt": "100", "investmentType": "1", "period": "daily"});
+    let msg = expect_http_error(
+        client
+            .place_recurring_buy_order(recur_order)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(grid::endpoints::PLACE_RECURRING_BUY_ORDER));
+
+    let amend_recur = json!({"algoId": "123", "amt": "200"});
+    let msg = expect_http_error(
+        client
+            .amend_recurring_buy_order(amend_recur)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(grid::endpoints::AMEND_RECURRING_BUY_ORDER));
+
+    let stop_recur = json!({"algoId": "123"});
+    let msg = expect_http_error(
+        client
+            .stop_recurring_buy_order(stop_recur)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(grid::endpoints::STOP_RECURRING_BUY_ORDER));
+
+    let list = json!({"algoOrderType": "recurring"});
+    let msg = expect_http_error(
+        client
+            .get_recurring_buy_order_list(Some(list))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(grid::endpoints::GET_RECURRING_BUY_ORDER_LIST));
+
+    let hist = json!({"algoOrderType": "recurring"});
+    let msg = expect_http_error(
+        client
+            .get_recurring_buy_order_history(Some(hist))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(grid::endpoints::GET_RECURRING_BUY_ORDER_HISTORY));
+
+    let det = json!({"algoId": "123"});
+    let msg = expect_http_error(
+        client
+            .get_recurring_buy_order_details(det)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(grid::endpoints::GET_RECURRING_BUY_ORDER_DETAILS));
+
+    let sub_ord = json!({"algoId": "123"});
+    let msg = expect_http_error(
+        client
+            .get_recurring_buy_sub_orders(sub_ord)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(grid::endpoints::GET_RECURRING_BUY_SUB_ORDERS));
+}
+
+#[tokio::test]
+async fn finance_paths_cover_basic_calls() {
+    let client = dummy_client();
+
+    let offers_params = json!({"ccy": "USDT"});
+    let msg = expect_http_error(
+        client
+            .defi_get_offers(Some(offers_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::DEFI_OFFERS));
+
+    let purchase_body = json!({"ccy": "USDT", "amt": "10", "productId": "pid"});
+    let msg = expect_http_error(client.defi_purchase(purchase_body).await.unwrap_err());
+    assert!(msg.contains(finance::endpoints::DEFI_PURCHASE));
+
+    let redeem_body = json!({"ordId": "123", "protocolType": "staking"});
+    let msg = expect_http_error(client.defi_redeem(redeem_body).await.unwrap_err());
+    assert!(msg.contains(finance::endpoints::DEFI_REDEEM));
+
+    let cancel_body = json!({"ordId": "123", "protocolType": "staking"});
+    let msg = expect_http_error(client.defi_cancel(cancel_body).await.unwrap_err());
+    assert!(msg.contains(finance::endpoints::DEFI_CANCEL));
+
+    let active_params = json!({"protocolType": "staking"});
+    let msg = expect_http_error(
+        client
+            .defi_orders_active(Some(active_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::DEFI_ORDERS_ACTIVE));
+
+    let history_params = json!({"protocolType": "staking"});
+    let msg = expect_http_error(
+        client
+            .defi_orders_history(Some(history_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::DEFI_ORDERS_HISTORY));
+
+    let balance_params = json!({"ccy": "USDT"});
+    let msg = expect_http_error(
+        client
+            .saving_balance(Some(balance_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SAVING_BALANCE));
+
+    let saving_body = json!({"ccy": "USDT", "amt": "5", "side": "purchase"});
+    let msg = expect_http_error(
+        client
+            .saving_purchase_redemption(saving_body)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SAVING_PURCHASE_REDEMPTION));
+
+    let rate_body = json!({"ccy": "USDT", "rate": "0.01"});
+    let msg = expect_http_error(client.saving_set_lending_rate(rate_body).await.unwrap_err());
+    assert!(msg.contains(finance::endpoints::SAVING_SET_LENDING_RATE));
+
+    let lending_params = json!({"ccy": "USDT"});
+    let msg = expect_http_error(
+        client
+            .saving_lending_history(Some(lending_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SAVING_LENDING_HISTORY));
+
+    let public_params = json!({"ccy": "USDT"});
+    let msg = expect_http_error(
+        client
+            .saving_public_lending_rate(Some(public_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SAVING_PUBLIC_LENDING_RATE));
+
+    let earn_offers = json!({"ccy": "USDT"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_get_offers(Some(earn_offers))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_OFFERS));
+
+    let apr_params = json!({"ccy": "USDT"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_apr_history(Some(apr_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_APR_HISTORY));
+
+    let open_params = json!({"ccy": "USDT"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_open_orders(Some(open_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_OPEN_ORDERS));
+
+    let history_orders = json!({"ccy": "USDT"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_history_orders(Some(history_orders))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_HISTORY_ORDERS));
+
+    let simple_earn_body = json!({"ccy": "USDT", "amt": "10", "term": "7"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_place_order(simple_earn_body)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_PLACE_ORDER));
+
+    let repay_body = json!({"ordId": "123"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_repay_order(repay_body)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_REPAY_ORDER));
+}
+
+#[tokio::test]
+async fn broker_methods_build_params_and_return_http_error() {
+    let client = dummy_client();
+
+    let rebate_params = json!({"begin": "1609459200000", "end": "1612137600000"});
+    let msg = expect_http_error(
+        client
+            .fd_rebate_per_orders(rebate_params.clone())
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(broker::endpoints::FD_REBATE_PER_ORDERS));
+
+    let msg = expect_http_error(
+        client
+            .fd_get_rebate_per_orders(rebate_params)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(broker::endpoints::FD_GET_REBATE_PER_ORDERS));
+}
+
+#[tokio::test]
+async fn trading_data_methods_build_params_and_return_http_error() {
+    let client = dummy_client();
+
+    let msg = expect_http_error(client.get_support_coin().await.unwrap_err());
+    assert!(msg.contains(trading_data::endpoints::SUPPORT_COIN));
+
+    let params = json!({"ccy": "BTC", "instType": "SWAP"});
+    let msg = expect_http_error(
+        client
+            .get_taker_volume(Some(params.clone()))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(trading_data::endpoints::TAKER_VOLUME));
+
+    let msg = expect_http_error(
+        client
+            .get_margin_lending_ratio(Some(params.clone()))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(trading_data::endpoints::MARGIN_LENDING_RATIO));
+
+    let msg = expect_http_error(
+        client
+            .get_long_short_ratio(Some(params.clone()))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(trading_data::endpoints::LONG_SHORT_RATIO));
+
+    let msg = expect_http_error(
+        client
+            .get_contracts_open_interest_volume(Some(params.clone()))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(trading_data::endpoints::CONTRACTS_INTEREST_VOLUME));
+
+    let msg = expect_http_error(
+        client
+            .get_options_open_interest_volume(Some(params.clone()))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(trading_data::endpoints::OPTIONS_INTEREST_VOLUME));
+
+    let msg = expect_http_error(
+        client
+            .get_put_call_ratio(Some(params.clone()))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(trading_data::endpoints::PUT_CALL_RATIO));
+
+    let msg = expect_http_error(
+        client
+            .get_open_interest_volume_expiry(Some(params.clone()))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(trading_data::endpoints::OPEN_INTEREST_VOLUME_EXPIRY));
+
+    let msg = expect_http_error(
+        client
+            .get_interest_volume_strike(Some(params.clone()))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(trading_data::endpoints::INTEREST_VOLUME_STRIKE));
+
+    let msg = expect_http_error(client.get_taker_flow(Some(params)).await.unwrap_err());
+    assert!(msg.contains(trading_data::endpoints::TAKER_FLOW));
 }

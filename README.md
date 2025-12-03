@@ -14,6 +14,7 @@
 - **类型安全**：严格的请求/响应结构（`Balance`、`Order` 等类型与官方字段一致）；统一错误模型 `OkxError`。
 - **跨语言**：PyO3 提供 Python 同步/异步客户端与 WS 客户端，附 `.pyi` 类型存根。
 - **官方一致的签名**：`timestamp + method + requestPath + body` 的 HMAC-SHA256（详见 `okx-core::signer`，源自官方文档“REST Authentication”）。
+- **高级接口拓展**：补齐 Broker 返佣、Spread 交易、Rubik 交易数据、Block/RFQ 全量操作（含 MMP）、WS 高级频道（block/advanced algo/grid/recurring）及对应 Python 同步/异步绑定。
 
 ## 模块划分
 - `crates/okx-core`：`Config`、`Credentials`、`Signer`、`OkxError`、公共常量与所有类型定义。
@@ -34,6 +35,7 @@
 Rust：
 - 工作区直接构建：`cargo build --all` 或 `just build`。
 - 依赖方式：暂未发布 crates.io，可使用 path/git 引用，如 `cargo add okx-rest --path crates/okx-rest` 或 `--git https://github.com/user/okx_rs`。
+- WSL2 编译优化：可用 `just test-no-py` 跳过 okx-py 再用 `just test-py-fast` 分步低并发构建 okx-py，或手动 `CARGO_BUILD_JOBS=2 cargo test -p okx-py --no-run` 减少内存冲击。
 
 Python（建议 `uv` + `maturin`，Python 3.9+）：
 ```bash

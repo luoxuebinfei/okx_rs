@@ -42,6 +42,8 @@ pub mod endpoints {
     pub const POSITION_TIERS: &str = "/api/v5/public/position-tiers";
     /// Get interest rate and loan quota
     pub const INTEREST_RATE_LOAN_QUOTA: &str = "/api/v5/public/interest-rate-loan-quota";
+    /// Get VIP interest rate and loan quota
+    pub const VIP_INTEREST_RATE_LOAN_QUOTA: &str = "/api/v5/public/vip-interest-rate-loan-quota";
     /// Get underlying
     pub const UNDERLYING: &str = "/api/v5/public/underlying";
     /// Get insurance fund
@@ -157,6 +159,88 @@ pub struct GetPositionTiersParams {
     pub inst_family: Option<String>,
 }
 
+/// Query parameters for price limit.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetPriceLimitParams {
+    #[serde(rename = "instId")]
+    pub inst_id: String,
+}
+
+/// Query parameters for option summary.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetOptSummaryParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uly: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exp_time: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inst_family: Option<String>,
+}
+
+/// Query parameters for estimated price.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetEstimatedPriceParams {
+    #[serde(rename = "instId")]
+    pub inst_id: String,
+}
+
+/// Query parameters for discount rate and interest-free quota.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetDiscountQuotaParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ccy: Option<String>,
+}
+
+/// Query parameters for underlying.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetUnderlyingParams {
+    #[serde(rename = "instType", skip_serializing_if = "Option::is_none")]
+    pub inst_type: Option<String>,
+}
+
+/// Query parameters for insurance fund.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetInsuranceFundParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inst_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uly: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ccy: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inst_family: Option<String>,
+}
+
+/// Query parameters for convert contract coin.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetConvertContractCoinParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+    #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
+    pub inst_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sz: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub px: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+}
+
 /// System time response.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SystemTime {
@@ -247,6 +331,58 @@ pub trait PublicApi {
         &self,
         params: GetPositionTiersParams,
     ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get price limit.
+    fn get_price_limit(
+        &self,
+        params: GetPriceLimitParams,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get option summary.
+    fn get_opt_summary(
+        &self,
+        params: GetOptSummaryParams,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get estimated delivery/exercise price.
+    fn get_estimated_price(
+        &self,
+        params: GetEstimatedPriceParams,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get discount rate and interest-free quota.
+    fn get_discount_interest_free_quota(
+        &self,
+        params: GetDiscountQuotaParams,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get interest rate and loan quota.
+    fn get_interest_rate_loan_quota(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get VIP interest rate and loan quota.
+    fn get_vip_interest_rate_loan_quota(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get underlying list.
+    fn get_underlying(
+        &self,
+        params: GetUnderlyingParams,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get insurance fund.
+    fn get_insurance_fund(
+        &self,
+        params: GetInsuranceFundParams,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Convert contract coin units.
+    fn get_convert_contract_coin(
+        &self,
+        params: GetConvertContractCoinParams,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
 }
 
 impl PublicApi for OkxRestClient {
@@ -294,6 +430,54 @@ impl PublicApi for OkxRestClient {
 
     async fn get_position_tiers(&self, params: GetPositionTiersParams) -> Result<Vec<Value>> {
         self.get_public(endpoints::POSITION_TIERS, Some(&params))
+            .await
+    }
+
+    async fn get_price_limit(&self, params: GetPriceLimitParams) -> Result<Vec<Value>> {
+        self.get_public(endpoints::PRICE_LIMIT, Some(&params)).await
+    }
+
+    async fn get_opt_summary(&self, params: GetOptSummaryParams) -> Result<Vec<Value>> {
+        self.get_public(endpoints::OPT_SUMMARY, Some(&params)).await
+    }
+
+    async fn get_estimated_price(&self, params: GetEstimatedPriceParams) -> Result<Vec<Value>> {
+        self.get_public(endpoints::ESTIMATED_PRICE, Some(&params))
+            .await
+    }
+
+    async fn get_discount_interest_free_quota(
+        &self,
+        params: GetDiscountQuotaParams,
+    ) -> Result<Vec<Value>> {
+        self.get_public(endpoints::DISCOUNT_RATE_INTEREST_FREE_QUOTA, Some(&params))
+            .await
+    }
+
+    async fn get_interest_rate_loan_quota(&self) -> Result<Vec<Value>> {
+        self.get_public::<Value, ()>(endpoints::INTEREST_RATE_LOAN_QUOTA, None)
+            .await
+    }
+
+    async fn get_vip_interest_rate_loan_quota(&self) -> Result<Vec<Value>> {
+        self.get_public::<Value, ()>(endpoints::VIP_INTEREST_RATE_LOAN_QUOTA, None)
+            .await
+    }
+
+    async fn get_underlying(&self, params: GetUnderlyingParams) -> Result<Vec<Value>> {
+        self.get_public(endpoints::UNDERLYING, Some(&params)).await
+    }
+
+    async fn get_insurance_fund(&self, params: GetInsuranceFundParams) -> Result<Vec<Value>> {
+        self.get_public(endpoints::INSURANCE_FUND, Some(&params))
+            .await
+    }
+
+    async fn get_convert_contract_coin(
+        &self,
+        params: GetConvertContractCoinParams,
+    ) -> Result<Vec<Value>> {
+        self.get_public(endpoints::CONVERT_CONTRACT_COIN, Some(&params))
             .await
     }
 }

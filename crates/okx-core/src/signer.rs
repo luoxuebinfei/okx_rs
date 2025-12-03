@@ -184,6 +184,7 @@ impl Signer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_pre_hash() {
@@ -220,5 +221,46 @@ mod tests {
         let signature = Signer::sign("test_message", "test_secret");
         // Verify it's valid base64
         assert!(STANDARD.decode(&signature).is_ok());
+    }
+
+    #[test]
+    fn generate_public_headers_sets_simulated_flag() {
+        let headers = Signer::generate_public_headers(true);
+        let map: HashMap<_, _> = headers.into_iter().collect();
+        assert_eq!(map[headers::CONTENT_TYPE], headers::APPLICATION_JSON);
+        assert_eq!(map[headers::X_SIMULATED_TRADING], "1");
+
+        let headers_live = Signer::generate_public_headers(false);
+        let map_live: HashMap<_, _> = headers_live.into_iter().collect();
+        assert_eq!(map_live[headers::X_SIMULATED_TRADING], "0");
+    }
+
+    #[test]
+    fn generate_headers_builds_expected_signature_and_fields() {
+        let signer = Signer::new(Credentials::new("api", "secret", "pass"));
+        let body = r#"{"k":1}"#;
+        let headers = signer.generate_headers("post", "/api/v5/unit", body, true);
+        let map: HashMap<_, _> = headers.into_iter().collect();
+
+        assert_eq!(map[headers::OK_ACCESS_KEY], "api");
+        assert_eq!(map[headers::OK_ACCESS_PASSPHRASE], "pass");
+        assert_eq!(map[headers::X_SIMULATED_TRADING], "1");
+        assert_eq!(map[headers::CONTENT_TYPE], headers::APPLICATION_JSON);
+
+        let ts = &map[headers::OK_ACCESS_TIMESTAMP];
+        let pre_hash = Signer::pre_hash(ts, "POST", "/api/v5/unit", body);
+        let expected_sign = Signer::sign(&pre_hash, "secret");
+        assert_eq!(map[headers::OK_ACCESS_SIGN], expected_sign);
+    }
+
+    #[test]
+    fn ws_login_params_signature_matches_timestamp() {
+        let signer = Signer::new(Credentials::new("api", "secret", "pass"));
+        let (api_key, passphrase, ts, sign) = signer.generate_ws_login_params();
+
+        assert_eq!(api_key, "api");
+        assert_eq!(passphrase, "pass");
+        let expected = Signer::sign(&format!("{ts}GET/users/self/verify"), "secret");
+        assert_eq!(sign, expected);
     }
 }

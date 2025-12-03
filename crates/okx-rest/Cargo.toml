@@ -21,3 +21,5 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+futures-util = { workspace = true }
+okx-ws = { path = "../okx-ws" }

@@ -226,7 +226,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use std::{
         io::{Read, Write},
-        net::{Shutdown, TcpListener},
+        net::{Shutdown, TcpListener, TcpStream},
         thread,
         time::Duration,
     };
@@ -242,6 +242,20 @@ mod tests {
     #[derive(Debug, Deserialize)]
     struct DummyData {
         value: i32,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct SpecialParams {
+        keyword: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        inst_type: Option<String>,
+    }
+
+    #[derive(Debug, Serialize)]
+    struct OptionalOnly {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        foo: Option<String>,
     }
 
     fn client_with_base(base_url: &str) -> OkxRestClient {
@@ -278,6 +292,62 @@ mod tests {
         // 非本项目 base 前缀时应原样返回
         let full_url = "https://other.com/keep";
         assert_eq!(client.extract_request_path(full_url), full_url);
+    }
+
+    #[test]
+    fn build_url_encodes_special_chars_and_vector_params() {
+        let client = client_with_base("https://example.com");
+        let params = SpecialParams {
+            keyword: "BTC/USDT test".into(),
+            inst_type: Some("SWAP,SPOT".into()),
+        };
+
+        let url = client
+            .build_url("/api/v5/search", Some(&params))
+            .expect("应成功编码参数");
+
+        assert_eq!(
+            url,
+            "https://example.com/api/v5/search?keyword=BTC%2FUSDT+test&instType=SWAP%2CSPOT"
+        );
+    }
+
+    #[test]
+    fn build_url_ignores_empty_query() {
+        let client = client_with_base("https://example.com");
+        let params = OptionalOnly { foo: None };
+
+        let url = client
+            .build_url("/api/v5/empty", Some(&params))
+            .expect("空参数也应成功");
+        assert_eq!(url, "https://example.com/api/v5/empty");
+    }
+
+    #[test]
+    fn spawn_response_server_serves_body() {
+        let Some((base_url, handle)) = (0..3).find_map(|_| {
+            let server = spawn_response_server("200 OK", r#"{"value":1}"#);
+            if server.is_none() {
+                thread::sleep(Duration::from_millis(10));
+            }
+            server
+        }) else {
+            eprintln!("无法绑定本地端口，跳过验证响应内容");
+            return;
+        };
+
+        let addr = base_url.strip_prefix("http://").expect("需含 http 前缀");
+        let mut stream = TcpStream::connect(addr).expect("应能连接到本地服务");
+        stream
+            .write_all(b"GET / HTTP/1.1\r\nHost: test\r\n\r\n")
+            .expect("应能写入请求");
+
+        let mut buf = String::new();
+        stream.read_to_string(&mut buf).expect("应能读取响应体");
+        assert!(buf.contains("200 OK"));
+        assert!(buf.contains(r#"{"value":1}"#));
+
+        handle.join().expect("响应线程应正常结束");
     }
 
     #[test]
@@ -430,6 +500,31 @@ mod tests {
             "超时错误不应拖延过长"
         );
         handle.join().expect("本地挂起线程应正常结束");
+    }
+
+    #[test]
+    fn spawn_hanging_server_accepts_and_closes_after_delay() {
+        let Some((base_url, handle)) = (0..3).find_map(|_| {
+            let server = spawn_hanging_server(Duration::from_millis(30));
+            if server.is_none() {
+                thread::sleep(Duration::from_millis(10));
+            }
+            server
+        }) else {
+            eprintln!("无法绑定本地端口，跳过挂起校验");
+            return;
+        };
+
+        let addr = base_url.strip_prefix("http://").expect("需含 http 前缀");
+        let mut stream = TcpStream::connect(addr).expect("应能连接到挂起服务");
+        stream.write_all(b"ping").expect("应能写入触发读取");
+
+        // 等待服务端休眠并关闭
+        thread::sleep(Duration::from_millis(80));
+        let mut buf = [0u8; 8];
+        let _ = stream.read(&mut buf);
+
+        handle.join().expect("挂起线程应正常结束");
     }
 
     #[tokio::test]

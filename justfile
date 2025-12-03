@@ -8,9 +8,17 @@ default:
 build:
     cargo build --all
 
-# 运行所有 Rust 测试
+# 运行所有 Rust 测试（包括集成测试，可能需要网络连接）
 test:
-    cargo test --all
+    cargo test --workspace
+
+# 仅运行单元测试（快速，无网络请求，推荐用于 WSL）
+test-unit:
+    cargo test --workspace --lib
+
+# 运行集成测试（需要网络连接）
+test-integration:
+    cargo test --workspace --test '*'
 
 # 检查代码（快速）
 check:
@@ -75,14 +83,13 @@ py-setup:
     uv venv --python 3.12
     source .venv/bin/activate && cd crates/okx-py && uv pip install -e ".[dev]"
 
-# 生成 HTML 覆盖率（含 okx-py 插桩）
+# 生成 HTML 覆盖率（仅 Rust 代码，WSL 友好）
 cov-html:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    bash scripts/cov-html.sh
+    cargo llvm-cov --workspace --exclude okx-py --html --output-dir target/llvm-cov/html
+    @echo "覆盖率报告: target/llvm-cov/html/index.html"
 
-# 覆盖率（全量 pytest）
-cov-html-full:
+# 覆盖率（完整版，含 okx-py Python 绑定，需要稳定环境）
+cov-html-with-py:
     #!/usr/bin/env bash
     set -euo pipefail
     PYTEST_ARGS="crates/okx-py/tests" bash scripts/cov-html.sh

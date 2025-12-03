@@ -66,3 +66,17 @@ impl OkxError {
         matches!(self, Self::Api { code: c, .. } if c == code)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn api_helper_builds_error_and_matches_code() {
+        let err = OkxError::api("51000", "failure");
+        assert!(matches!(err, OkxError::Api { .. }));
+        assert!(err.is_api_error("51000"));
+        assert!(!err.is_api_error("400"));
+        assert_eq!(err.to_string(), "API error: code=51000, msg=failure");
+    }
+}

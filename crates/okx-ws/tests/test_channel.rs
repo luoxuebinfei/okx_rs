@@ -139,3 +139,107 @@ fn test_balance_and_position_minimal_serialization() {
     let json = serde_json::to_string(&chan).expect("序列化应成功");
     assert_eq!(json, "{\"channel\":\"balance_and_position\"}");
 }
+
+#[test]
+fn test_fills_channel_serialization_and_flags() {
+    let chan = Channel::Fills {
+        inst_type: "SWAP".into(),
+        inst_family: Some("BTC-USD".into()),
+        inst_id: None,
+    };
+    assert!(chan.is_private());
+    assert_eq!(chan.name(), "fills");
+
+    let value = serde_json::to_value(&chan).expect("序列化应成功");
+    assert_eq!(value["channel"], "fills");
+    assert_eq!(value["instType"], "SWAP");
+    assert_eq!(value["instFamily"], "BTC-USD");
+    assert!(value.get("instId").is_none());
+}
+
+#[test]
+fn test_strategy_channels_serialization() {
+    // grid-orders
+    let grid = Channel::GridOrders {
+        algo_id: Some("123".into()),
+        inst_type: Some("SWAP".into()),
+        inst_id: Some("BTC-USDT-SWAP".into()),
+    };
+    assert!(grid.is_private());
+    assert_eq!(grid.name(), "grid-orders");
+    let v = serde_json::to_value(&grid).unwrap();
+    assert_eq!(v["channel"], "grid-orders");
+    assert_eq!(v["algoId"], "123");
+    assert_eq!(v["instType"], "SWAP");
+
+    // copytrading-lead-notify
+    let copy = Channel::CopyTradingLeadNotify {
+        inst_id: Some("BTC-USDT".into()),
+    };
+    assert!(copy.is_private());
+    assert_eq!(copy.name(), "copytrading-lead-notify");
+    let v = serde_json::to_value(&copy).unwrap();
+    assert_eq!(v["channel"], "copytrading-lead-notify");
+
+    // recurring-orders
+    let recur = Channel::RecurringOrders {
+        algo_id: Some("456".into()),
+    };
+    assert!(recur.is_private());
+    assert_eq!(recur.name(), "recurring-orders");
+    let v = serde_json::to_value(&recur).unwrap();
+    assert_eq!(v["channel"], "recurring-orders");
+    assert_eq!(v["algoId"], "456");
+}
+
+#[test]
+fn test_block_channels_serialization() {
+    let rfqs = Channel::Rfqs {
+        inst_family: Some("BTC-USD".into()),
+    };
+    assert!(rfqs.is_private());
+    assert_eq!(rfqs.name(), "rfqs");
+    let v = serde_json::to_value(&rfqs).unwrap();
+    assert_eq!(v["channel"], "rfqs");
+    assert_eq!(v["instFamily"], "BTC-USD");
+
+    let public_block = Channel::PublicBlockTrades { inst_family: None };
+    assert!(!public_block.is_private());
+    assert_eq!(public_block.name(), "public-block-trades");
+    let v = serde_json::to_value(&public_block).unwrap();
+    assert_eq!(v["channel"], "public-block-trades");
+    assert!(v.get("instFamily").is_none());
+
+    let tickers = Channel::BlockTickers {
+        inst_family: Some("BTC-USD".into()),
+    };
+    assert!(!tickers.is_private());
+    assert_eq!(tickers.name(), "block-tickers");
+    let v = serde_json::to_value(&tickers).unwrap();
+    assert_eq!(v["channel"], "block-tickers");
+    assert_eq!(v["instFamily"], "BTC-USD");
+}
+
+#[test]
+fn test_advanced_algo_channel_names() {
+    let advance = Channel::AlgoAdvance {
+        inst_type: Some("SWAP".into()),
+        inst_family: None,
+        inst_id: Some("BTC-USD-SWAP".into()),
+    };
+    assert!(advance.is_private());
+    assert_eq!(advance.name(), "algo-advance");
+
+    let grid_spot = Channel::GridOrdersSpot {
+        algo_id: Some("1".into()),
+        inst_id: Some("BTC-USDT".into()),
+    };
+    assert!(grid_spot.is_private());
+    assert_eq!(grid_spot.name(), "grid-orders-spot");
+
+    let recurring = Channel::AlgoRecurringBuy {
+        algo_id: Some("2".into()),
+    };
+    assert!(recurring.is_private());
+    assert_eq!(recurring.name(), "algo-recurring-buy");
+}

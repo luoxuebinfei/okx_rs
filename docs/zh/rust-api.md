@@ -36,7 +36,7 @@
   - Market（`market.rs`）：`/api/v5/market/tickers`、`/ticker`、`/books`（及 books5/books50/books-l2-tbt）、`/candles`、`/trades`、`/index-tickers`。
   - Public（`public.rs`）：`/api/v5/public/instruments`、`/funding-rate`、`/funding-rate-history`、`/system-time`、`/mark-price`。
 - **返回值**：所有方法返回 `Result<Vec<T>>` 或对应列表，字段名与官方响应保持一致。
-- **示例**：详见仓库 `examples/rest_basic.rs`。
+- **示例**：详见仓库 `crates/okx-rest/examples/rest_basic.rs`。
 
 ### 市场行情常用调用（对齐官方 Market Data）
 | 需求 | 官方路径 | 关键参数 | Rust 用法 | Python 用法 |
@@ -83,6 +83,14 @@
 - `GET /account/max-avail-size`（GetMaxAvailSizeParams）：`instId`，`tdMode`，`ccy`/`reduceOnly`/`quickMgnType`(可选)。
 - `GET /account/trade-fee`（GetFeeRatesParams）：`instType`(必填)，`instId`/`uly`/`instFamily`(可选)。
 - `POST /account/set-position-mode`：`posMode`(one_way_mode/long_short_mode)。
+
+### 账户高级与系统状态补充
+| 功能 | 官方路径 | 关键参数 | Rust 用法 | Python 用法 |
+| ---- | -------- | -------- | --------- | ----------- |
+| 调整持仓保证金 | `POST /api/v5/account/position/margin-balance` | `instId`、`posSide`、`type`(add/reduce)、`amt`、`loanTrans` 可选 | `client.adjustment_margin(AdjustmentMarginRequest { inst_id, pos_side, r#type, amt, loan_trans }).await?` | `client.adjustment_margin(inst_id, pos_side, type_, amt, loan_trans=None)` / 异步同名 |
+| 设置风险对冲类型 | `POST /api/v5/account/set-riskOffset-type` | `type` | `client.set_risk_offset_type(SetRiskOffsetTypeRequest { r#type }).await?` | `client.set_risk_offset_type(type_)` / 异步同名 |
+| 设置自动借币 | `POST /api/v5/account/set-auto-loan` | `autoLoan` 可选字符串 | `client.set_auto_loan(SetAutoLoanRequest { auto_loan }).await?` | `client.set_auto_loan(auto_loan=None)` / 异步同名 |
+| 系统状态 | `GET /api/v5/system/status` | `state` 可选（0 正常 / 1 维护） | `client.get_system_status(Some("0")).await?` | `client.get_system_status(state=None)` / 异步同名 |
 
 ### Trade（交易下单）常用调用
 | 需求 | 官方路径 | 关键参数 | Rust 用法 | Python 用法 |
@@ -184,7 +192,7 @@
 - **自动重连**（`reconnect.rs`）
   - `ReconnectConfig`：`initial_delay`/`max_delay`/`backoff_multiplier`/`max_attempts`/`restore_subscriptions`。
   - `ReconnectingWsClient::connect(config, ConnectionType, reconnect_config)`：内置订阅恢复与状态查询 `state()` / `is_connected()` / `subscription_count()`。
-- **示例**：`examples/ws_public.rs` 展示订阅 tickers，`crates/okx-py/src/ws_client.rs` 为 Python 绑定实现示例。
+- **示例**：`crates/okx-rest/examples/ws_public.rs` 展示订阅 tickers，`crates/okx-py/src/ws_client.rs` 为 Python 绑定实现示例。
 
 ## 运行与文档
 - 构建与测试：`just build` / `just test` / `just clippy`。

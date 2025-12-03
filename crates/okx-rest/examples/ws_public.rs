@@ -33,7 +33,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     break;
                 }
             }
-            WsMessage::Event { event, code, msg, .. } => {
+            WsMessage::Event {
+                event, code, msg, ..
+            } => {
                 println!("event={event:?} code={code:?} msg={msg:?}");
             }
             _ => {}

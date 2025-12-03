@@ -92,7 +92,35 @@ impl PyConfig {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use okx_core::REST_API_URL;
+
+    #[test]
+    fn credentials_repr_masks_api_key() {
+        let creds = PyCredentials::new(
+            "apikey123456".to_string(),
+            "secret_key".to_string(),
+            "pass".to_string(),
+        );
+        assert_eq!(creds.inner.api_key(), "apikey123456");
+        assert_eq!(creds.__repr__(), "Credentials(api_key='apikey12...')");
+    }
+
+    #[test]
+    fn config_new_keeps_simulated_flag_and_timeout() {
+        let creds = PyCredentials::new("k".into(), "s".into(), "p".into());
+        let config = PyConfig::new(creds, true, 7);
+
+        assert!(config.simulated());
+        assert_eq!(config.rest_url(), REST_API_URL);
+        assert_eq!(config.inner.timeout_secs(), 7);
+
+        let repr = config.__repr__();
+        assert!(repr.contains("simulated=true"));
+        assert!(repr.contains(REST_API_URL));
+    }
+}
 
 /// Python wrapper for Balance.
 #[pyclass(name = "Balance")]

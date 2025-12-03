@@ -6,6 +6,7 @@
 - 覆盖官方 OKX 文档的主要 REST 接口：账户/交易/资金/行情/公共数据，内置签名、超时、代理配置。
 - WebSocket 支持公共与私有频道，含心跳与自动重连（订阅恢复）。
 - Python 绑定提供同步/异步 REST 客户端与 WS 客户端，附类型存根与示例。
+- 新增高级 API 覆盖：Broker 返佣、Spread 交易、Rubik 交易数据、Block/RFQ 批量操作与 MMP，以及对应 Python 绑定与 WS 高级频道订阅。
 - 新增文档：中英文 README、Rust/Python API 说明、发布指南；补充示例与发布清单。
 
 ### English

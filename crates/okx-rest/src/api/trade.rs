@@ -57,6 +57,12 @@ pub mod endpoints {
     pub const CLOSE_POSITION: &str = "/api/v5/trade/close-position";
     /// Get algo order details
     pub const ALGO_ORDER_DETAILS: &str = "/api/v5/trade/order-algo";
+    /// Mass cancel
+    pub const MASS_CANCEL: &str = "/api/v5/trade/mass-cancel";
+    /// Cancel all after
+    pub const CANCEL_ALL_AFTER: &str = "/api/v5/trade/cancel-all-after";
+    /// Order precheck
+    pub const ORDER_PRECHECK: &str = "/api/v5/trade/order-precheck";
 }
 
 /// Query parameters for get_order.
@@ -319,6 +325,18 @@ pub trait TradeApi {
         request: AmendOrderRequest,
     ) -> impl std::future::Future<Output = Result<Vec<AmendOrderResponse>>> + Send;
 
+    /// Amend multiple orders in a single request.
+    ///
+    /// ## API Details
+    ///
+    /// - Endpoint: POST /api/v5/trade/amend-batch-orders
+    /// - Rate limit: 60 requests per 2 seconds
+    /// - Permission: Trade
+    fn amend_batch_orders(
+        &self,
+        requests: Vec<AmendOrderRequest>,
+    ) -> impl std::future::Future<Output = Result<Vec<AmendOrderResponse>>> + Send;
+
     /// Get order details.
     ///
     /// ## API Details
@@ -450,6 +468,24 @@ pub trait TradeApi {
         &self,
         request: ClosePositionRequest,
     ) -> impl std::future::Future<Output = Result<Vec<ClosePositionResponse>>> + Send;
+
+    /// Mass cancel orders (全量撤单)。
+    fn mass_cancel(
+        &self,
+        request: serde_json::Value,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Cancel all after（定时全撤）。
+    fn cancel_all_after(
+        &self,
+        request: serde_json::Value,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Order 预检查。
+    fn order_precheck(
+        &self,
+        request: serde_json::Value,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
 }
 
 /// Query parameters for get_algo_orders_pending.
@@ -576,6 +612,13 @@ impl TradeApi for OkxRestClient {
         self.post(endpoints::AMEND_ORDER, &request).await
     }
 
+    async fn amend_batch_orders(
+        &self,
+        requests: Vec<AmendOrderRequest>,
+    ) -> Result<Vec<AmendOrderResponse>> {
+        self.post(endpoints::AMEND_BATCH_ORDERS, &requests).await
+    }
+
     async fn get_order(&self, params: GetOrderParams) -> Result<Vec<Order>> {
         self.get(endpoints::GET_ORDER, Some(&params)).await
     }
@@ -650,5 +693,17 @@ impl TradeApi for OkxRestClient {
         request: ClosePositionRequest,
     ) -> Result<Vec<ClosePositionResponse>> {
         self.post(endpoints::CLOSE_POSITION, &request).await
+    }
+
+    async fn mass_cancel(&self, request: serde_json::Value) -> Result<Vec<Value>> {
+        self.post(endpoints::MASS_CANCEL, &request).await
+    }
+
+    async fn cancel_all_after(&self, request: serde_json::Value) -> Result<Vec<Value>> {
+        self.post(endpoints::CANCEL_ALL_AFTER, &request).await
+    }
+
+    async fn order_precheck(&self, request: serde_json::Value) -> Result<Vec<Value>> {
+        self.post(endpoints::ORDER_PRECHECK, &request).await
     }
 }

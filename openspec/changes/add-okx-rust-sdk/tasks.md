@@ -121,6 +121,14 @@
 - [x] 8.3 Funding：non-tradable-assets、transfer-state、purchase_redempt、bills、lightning 存取、lending 设置/历史/汇总、cancel-withdrawal、convert-dust-assets、asset-valuation、saving-balance、deposit/withdraw status
 - [x] 8.4 Market/Public：历史/指数/标记 K 线、历史成交、轻量深度、块交易系列、option family trades、delivery-exercise history、open-interest、public position-tiers
 
+## 9. 覆盖官方接口缺口（新增）
+- [x] 9.1 Rust REST：补齐 Account `max-loan`、`interest-rate` 端点（类型、trait、实现）。
+- [x] 9.2 Rust REST：补齐 Trade `amend-batch-orders` 端点（批量改单，含请求/响应/实现）。
+- [x] 9.3 Rust REST：补齐 Public 端点 `price-limit`、`opt-summary`、`estimated-price`、`discount-rate-interest-free-quota`、`interest-rate-loan-quota`、`underlying`、`insurance-fund`、`convert-contract-coin`（含参数结构与实现）。
+- [x] 9.4 Python REST 绑定：同步暴露 9.1-9.3 新增方法（同步/异步），更新注释与参数。
+- [x] 9.5 Python WS 绑定：补齐 Rust 已有频道映射 `books5`、`books50-l2-tbt`、`books-l2-tbt`、`mark-price`、`index-tickers`、`funding-rate`、`orders-algo`、`balance_and_position`。
+- [ ] 9.6 官方文档未覆盖模块排查与计划：SubAccount、Convert（闪兑）、CopyTrading/策略、Broker 等家族是否需要纳入；如需，拆分新任务与变更提案。
+
 ## Dependencies
 
 - 任务 3.x 依赖 2.1-2.6 完成

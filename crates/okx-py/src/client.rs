@@ -8,14 +8,18 @@ use okx_core::types::{
     AmendOrderRequest, CancelAlgoOrderRequest, CancelOrderRequest, FundsTransferRequest,
     PlaceAlgoOrderRequest, PlaceOrderRequest, WithdrawalRequest,
 };
+use okx_core::types::{
+    ConvertHistoryParams, ConvertTradeRequest, EasyConvertRequest, EstimateQuoteParams,
+    OneClickRepayRequest,
+};
 use okx_rest::api::account::{
-    BorrowRepayHistoryParams, BorrowRepayRequest, GetAccountPositionTiersParams,
-    GetBillsArchiveParams, GetBillsParams, GetFeeRatesParams, GetGreeksParams,
-    GetInterestAccruedParams, GetLeverageInfoParams, GetMaxAvailSizeParams, GetMaxSizeParams,
-    GetMaxWithdrawalParams, GetPositionsHistoryParams, GetSimulatedMarginParams,
-    GetVipInterestParams, PositionBuilderRequest, SetAccountLevelRequest, SetGreeksRequest,
-    SetIsolatedModeRequest, SetLeverageRequest, SpotBorrowRepayHistoryParams,
-    SpotManualBorrowRepayRequest,
+    AdjustmentMarginRequest, BorrowRepayHistoryParams, BorrowRepayRequest,
+    GetAccountPositionTiersParams, GetBillsArchiveParams, GetBillsParams, GetFeeRatesParams,
+    GetGreeksParams, GetInterestAccruedParams, GetLeverageInfoParams, GetMaxAvailSizeParams,
+    GetMaxLoanParams, GetMaxSizeParams, GetMaxWithdrawalParams, GetPositionsHistoryParams,
+    GetSimulatedMarginParams, GetVipInterestParams, PositionBuilderRequest, SetAccountLevelRequest,
+    SetAutoLoanRequest, SetGreeksRequest, SetIsolatedModeRequest, SetLeverageRequest,
+    SetRiskOffsetTypeRequest, SpotBorrowRepayHistoryParams, SpotManualBorrowRepayRequest,
 };
 use okx_rest::api::funding::{
     CancelWithdrawalParams, ConvertDustAssetsRequest, GetAssetValuationParams,
@@ -30,15 +34,25 @@ use okx_rest::api::market::{
     GetIndexTickersParams, GetMarkPriceCandlesParams, GetTickersParams,
 };
 use okx_rest::api::public::{
-    GetDeliveryExerciseHistoryParams, GetFundingRateHistoryParams, GetInstrumentsParams,
-    GetMarkPriceParams, GetOpenInterestParams, GetPositionTiersParams,
+    GetConvertContractCoinParams, GetDeliveryExerciseHistoryParams, GetDiscountQuotaParams,
+    GetEstimatedPriceParams, GetFundingRateHistoryParams, GetInstrumentsParams,
+    GetInsuranceFundParams, GetMarkPriceParams, GetOpenInterestParams, GetOptSummaryParams,
+    GetPositionTiersParams, GetPriceLimitParams, GetUnderlyingParams,
+};
+use okx_rest::api::subaccount::{
+    ResetSubaccountApikeyRequest, SetTransferOutRequest, SetVipLoanRequest, SubaccountBillsParams,
+    SubaccountInterestParams, SubaccountListParams, SubaccountTransferRequest,
 };
 use okx_rest::api::trade::{
     AmendAlgoOrderRequest, ClosePositionRequest, GetAlgoOrderDetailsParams,
     GetAlgoOrdersHistoryParams, GetAlgoOrdersParams, GetFillsHistoryParams, GetFillsParams,
     GetOrderParams, GetOrdersHistoryArchiveParams, GetOrdersHistoryParams, GetOrdersPendingParams,
 };
-use okx_rest::{AccountApi, FundingApi, MarketApi, OkxRestClient, PublicApi, TradeApi};
+use okx_rest::{
+    AccountApi, BlockRfqApi, BrokerApi, ConvertApi, CopyTradingApi, FinanceApi, FundingApi,
+    GridApi, MarketApi, OkxRestClient, PublicApi, SpreadApi, StatusApi, SubaccountApi, TradeApi,
+    TradingDataApi,
+};
 
 use crate::types::*;
 use crate::{map_values, parse_json_array, parse_json_value, to_py_err, values_to_py_list};
@@ -233,6 +247,41 @@ impl PyOkxClient {
                 .await
                 .map(|mut v| v.pop().map(PyMaxAvailSize::from))
                 .map_err(to_py_err)
+        })
+    }
+
+    /// 查询最大可借 / Get maximum loan amount.
+    #[pyo3(signature = (inst_id, mgn_mode, mgn_ccy=None))]
+    fn get_max_loan(
+        &self,
+        inst_id: &str,
+        mgn_mode: &str,
+        mgn_ccy: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = GetMaxLoanParams {
+            inst_id: inst_id.to_string(),
+            mgn_mode: mgn_mode.to_string(),
+            mgn_ccy: mgn_ccy.map(String::from),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_max_loan(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询借贷利率 / Get interest rate.
+    #[pyo3(signature = (ccy=None))]
+    fn get_interest_rate(&self, ccy: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime.block_on(async {
+            self.client
+                .get_interest_rate(ccy)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
         })
     }
 
@@ -451,6 +500,61 @@ impl PyOkxClient {
         self.runtime.block_on(async {
             self.client
                 .set_isolated_mode(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 调整持仓保证金。
+    #[pyo3(signature = (inst_id, pos_side, type_, amt, loan_trans=None))]
+    fn adjustment_margin(
+        &self,
+        inst_id: &str,
+        pos_side: &str,
+        type_: &str,
+        amt: &str,
+        loan_trans: Option<bool>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = AdjustmentMarginRequest {
+            inst_id: inst_id.to_string(),
+            pos_side: pos_side.to_string(),
+            r#type: type_.to_string(),
+            amt: amt.to_string(),
+            loan_trans,
+        };
+        self.runtime.block_on(async {
+            self.client
+                .adjustment_margin(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 设置风险对冲类型。
+    fn set_risk_offset_type(&self, type_: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let request = SetRiskOffsetTypeRequest {
+            r#type: type_.to_string(),
+        };
+        self.runtime.block_on(async {
+            self.client
+                .set_risk_offset_type(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 设置自动借币。
+    #[pyo3(signature = (auto_loan=None))]
+    fn set_auto_loan(&self, auto_loan: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let request = SetAutoLoanRequest {
+            auto_loan: auto_loan.map(String::from),
+        };
+        self.runtime.block_on(async {
+            self.client
+                .set_auto_loan(request)
                 .await
                 .map_err(to_py_err)
                 .and_then(values_to_py_list)
@@ -950,6 +1054,67 @@ impl PyOkxClient {
                 .amend_order(request)
                 .await
                 .map(|mut v| v.pop().map(PyAmendOrderResult::from))
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 批量改单。
+    #[pyo3(signature = (orders))]
+    fn amend_batch_orders(
+        &self,
+        orders: Vec<(
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        )>,
+    ) -> PyResult<Vec<PyAmendOrderResult>> {
+        let requests: Vec<AmendOrderRequest> = orders
+            .into_iter()
+            .map(
+                |(
+                    inst_id,
+                    ord_id,
+                    cl_ord_id,
+                    req_id,
+                    new_sz,
+                    new_px,
+                    new_tp_trigger_px,
+                    new_tp_ord_px,
+                    new_sl_trigger_px,
+                    new_sl_ord_px,
+                    new_tp_trigger_px_type,
+                    new_sl_trigger_px_type,
+                )| AmendOrderRequest {
+                    inst_id,
+                    ord_id,
+                    cl_ord_id,
+                    req_id,
+                    new_sz,
+                    new_px,
+                    new_tp_trigger_px,
+                    new_tp_ord_px,
+                    new_sl_trigger_px,
+                    new_sl_ord_px,
+                    new_tp_trigger_px_type,
+                    new_sl_trigger_px_type,
+                },
+            )
+            .collect();
+
+        self.runtime.block_on(async {
+            self.client
+                .amend_batch_orders(requests)
+                .await
+                .map(|v| v.into_iter().map(PyAmendOrderResult::from).collect())
                 .map_err(to_py_err)
         })
     }
@@ -1903,6 +2068,843 @@ impl PyOkxClient {
         })
     }
 
+    // ==================== SubAccount API ====================
+
+    /// 子账户余额。
+    #[pyo3(signature = (sub_acct))]
+    fn get_subaccount_balance(&self, sub_acct: &str) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.get_subaccount_balance(sub_acct).await) })
+    }
+
+    /// 子账户账单。
+    #[pyo3(signature = (ccy=None, bill_type=None, sub_acct=None, after=None, before=None, limit=None))]
+    fn get_subaccount_bills(
+        &self,
+        ccy: Option<&str>,
+        bill_type: Option<&str>,
+        sub_acct: Option<&str>,
+        after: Option<&str>,
+        before: Option<&str>,
+        limit: Option<u32>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = SubaccountBillsParams {
+            ccy: ccy.map(String::from),
+            bill_type: bill_type.map(String::from),
+            sub_acct: sub_acct.map(String::from),
+            after: after.map(String::from),
+            before: before.map(String::from),
+            limit,
+        };
+        let params = if ccy.is_some()
+            || bill_type.is_some()
+            || sub_acct.is_some()
+            || after.is_some()
+            || before.is_some()
+            || limit.is_some()
+        {
+            Some(params)
+        } else {
+            None
+        };
+        self.runtime
+            .block_on(async { map_values(self.client.get_subaccount_bills(params).await) })
+    }
+
+    /// 重置子账户 APIKey。
+    #[pyo3(signature = (sub_acct, api_key, label, perm, ip=None))]
+    fn reset_subaccount_apikey(
+        &self,
+        sub_acct: &str,
+        api_key: &str,
+        label: &str,
+        perm: &str,
+        ip: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = ResetSubaccountApikeyRequest {
+            sub_acct: sub_acct.to_string(),
+            api_key: api_key.to_string(),
+            label: label.to_string(),
+            perm: perm.to_string(),
+            ip: ip.map(String::from),
+        };
+        self.runtime
+            .block_on(async { map_values(self.client.reset_subaccount_apikey(request).await) })
+    }
+
+    /// 子账户列表。
+    #[pyo3(signature = (enable=None, sub_acct=None, after=None, before=None, limit=None))]
+    fn get_subaccount_list(
+        &self,
+        enable: Option<bool>,
+        sub_acct: Option<&str>,
+        after: Option<&str>,
+        before: Option<&str>,
+        limit: Option<u32>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = SubaccountListParams {
+            enable,
+            sub_acct: sub_acct.map(String::from),
+            after: after.map(String::from),
+            before: before.map(String::from),
+            limit,
+        };
+        let params = if enable.is_some()
+            || sub_acct.is_some()
+            || after.is_some()
+            || before.is_some()
+            || limit.is_some()
+        {
+            Some(params)
+        } else {
+            None
+        };
+        self.runtime
+            .block_on(async { map_values(self.client.get_subaccount_list(params).await) })
+    }
+
+    /// 子账户划转。
+    #[pyo3(signature = (ccy, amt, froms, to, from_sub_account, to_sub_account, loan_trans=None, omit_pos_risk=None))]
+    fn subaccount_transfer(
+        &self,
+        ccy: &str,
+        amt: &str,
+        froms: &str,
+        to: &str,
+        from_sub_account: &str,
+        to_sub_account: &str,
+        loan_trans: Option<bool>,
+        omit_pos_risk: Option<bool>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = SubaccountTransferRequest {
+            ccy: ccy.to_string(),
+            amt: amt.to_string(),
+            froms: froms.to_string(),
+            to: to.to_string(),
+            from_sub_account: from_sub_account.to_string(),
+            to_sub_account: to_sub_account.to_string(),
+            loan_trans,
+            omit_pos_risk,
+        };
+        self.runtime
+            .block_on(async { map_values(self.client.subaccount_transfer(request).await) })
+    }
+
+    /// 托管子账户列表。
+    #[pyo3(signature = (sub_acct=None))]
+    fn get_entrust_subaccount_list(&self, sub_acct: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.get_entrust_subaccount_list(sub_acct).await) })
+    }
+
+    /// 设置子账户转出权限。
+    #[pyo3(signature = (sub_acct, can_trans_out))]
+    fn set_permission_transfer_out(
+        &self,
+        sub_acct: &str,
+        can_trans_out: bool,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = SetTransferOutRequest {
+            sub_acct: sub_acct.to_string(),
+            can_trans_out,
+        };
+        self.runtime
+            .block_on(async { map_values(self.client.set_permission_transfer_out(request).await) })
+    }
+
+    /// 子账户资金余额。
+    #[pyo3(signature = (sub_acct, ccy=None))]
+    fn get_subaccount_funding_balance(
+        &self,
+        sub_acct: &str,
+        ccy: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.get_funding_balance(sub_acct, ccy).await) })
+    }
+
+    /// 返佣信息查询。
+    #[pyo3(signature = (api_key))]
+    fn get_affiliate_rebate_info(&self, api_key: &str) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.get_affiliate_rebate_info(api_key).await) })
+    }
+
+    /// 设置子账户 VIP 借贷分配。
+    #[pyo3(signature = (enable, alloc_json))]
+    fn set_sub_accounts_vip_loan(
+        &self,
+        enable: bool,
+        alloc_json: &str,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let alloc =
+            parse_json_value(Some(alloc_json), "alloc")?.unwrap_or_else(|| serde_json::json!([]));
+        let request = SetVipLoanRequest { enable, alloc };
+        self.runtime
+            .block_on(async { map_values(self.client.set_sub_accounts_vip_loan(request).await) })
+    }
+
+    /// 子账户利息与限额。
+    #[pyo3(signature = (sub_acct=None, ccy=None))]
+    fn get_sub_account_borrow_interest_and_limit(
+        &self,
+        sub_acct: Option<&str>,
+        ccy: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = SubaccountInterestParams {
+            sub_acct: sub_acct.map(String::from),
+            ccy: ccy.map(String::from),
+        };
+        let params = if sub_acct.is_some() || ccy.is_some() {
+            Some(params)
+        } else {
+            None
+        };
+        self.runtime.block_on(async {
+            map_values(
+                self.client
+                    .get_sub_account_borrow_interest_and_limit(params)
+                    .await,
+            )
+        })
+    }
+
+    // ==================== Convert / Easy Convert / One-Click Repay ====================
+
+    /// 闪兑支持币种。
+    fn get_convert_currencies(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.get_convert_currencies().await) })
+    }
+
+    /// 闪兑币对。
+    #[pyo3(signature = (from_ccy, to_ccy))]
+    fn get_convert_currency_pair(&self, from_ccy: &str, to_ccy: &str) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime.block_on(async {
+            map_values(
+                self.client
+                    .get_convert_currency_pair(from_ccy, to_ccy)
+                    .await,
+            )
+        })
+    }
+
+    /// 闪兑报价。
+    #[pyo3(signature = (base_ccy, quote_ccy, side, rfq_sz, rfq_sz_ccy, cl_q_req_id=None, tag=None))]
+    fn estimate_convert_quote(
+        &self,
+        base_ccy: &str,
+        quote_ccy: &str,
+        side: &str,
+        rfq_sz: &str,
+        rfq_sz_ccy: &str,
+        cl_q_req_id: Option<&str>,
+        tag: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = EstimateQuoteParams {
+            base_ccy: base_ccy.to_string(),
+            quote_ccy: quote_ccy.to_string(),
+            side: side.to_string(),
+            rfq_sz: rfq_sz.to_string(),
+            rfq_sz_ccy: rfq_sz_ccy.to_string(),
+            cl_q_req_id: cl_q_req_id.map(String::from),
+            tag: tag.map(String::from),
+        };
+        self.runtime
+            .block_on(async { map_values(self.client.estimate_convert_quote(params).await) })
+    }
+
+    /// 闪兑成交。
+    #[pyo3(signature = (quote_id, base_ccy, quote_ccy, side, sz, sz_ccy, cl_t_req_id=None, tag=None))]
+    fn convert_trade(
+        &self,
+        quote_id: &str,
+        base_ccy: &str,
+        quote_ccy: &str,
+        side: &str,
+        sz: &str,
+        sz_ccy: &str,
+        cl_t_req_id: Option<&str>,
+        tag: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = ConvertTradeRequest {
+            quote_id: quote_id.to_string(),
+            base_ccy: base_ccy.to_string(),
+            quote_ccy: quote_ccy.to_string(),
+            side: side.to_string(),
+            sz: sz.to_string(),
+            sz_ccy: sz_ccy.to_string(),
+            cl_t_req_id: cl_t_req_id.map(String::from),
+            tag: tag.map(String::from),
+        };
+        self.runtime
+            .block_on(async { map_values(self.client.convert_trade(request).await) })
+    }
+
+    /// 闪兑历史。
+    #[pyo3(signature = (after=None, before=None, limit=None, tag=None))]
+    fn get_convert_history(
+        &self,
+        after: Option<&str>,
+        before: Option<&str>,
+        limit: Option<u32>,
+        tag: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = ConvertHistoryParams {
+            after: after.map(String::from),
+            before: before.map(String::from),
+            limit,
+            tag: tag.map(String::from),
+        };
+        let params = if after.is_some() || before.is_some() || limit.is_some() || tag.is_some() {
+            Some(params)
+        } else {
+            None
+        };
+        self.runtime
+            .block_on(async { map_values(self.client.get_convert_history(params).await) })
+    }
+
+    /// Easy Convert 支持币种。
+    fn get_easy_convert_currency_list(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.get_easy_convert_currency_list().await) })
+    }
+
+    /// Easy Convert 兑换。
+    #[pyo3(signature = (from_ccy, to_ccy))]
+    fn easy_convert(&self, from_ccy: Vec<String>, to_ccy: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let request = EasyConvertRequest {
+            from_ccy,
+            to_ccy: to_ccy.to_string(),
+        };
+        self.runtime
+            .block_on(async { map_values(self.client.easy_convert(request).await) })
+    }
+
+    /// Easy Convert 历史。
+    #[pyo3(signature = (after=None, before=None, limit=None))]
+    fn get_easy_convert_history(
+        &self,
+        after: Option<&str>,
+        before: Option<&str>,
+        limit: Option<u32>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime.block_on(async {
+            map_values(
+                self.client
+                    .get_easy_convert_history(after, before, limit)
+                    .await,
+            )
+        })
+    }
+
+    /// 一键还债支持币种。
+    fn get_one_click_repay_currency_list(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.get_one_click_repay_currency_list().await) })
+    }
+
+    /// 一键还债。
+    #[pyo3(signature = (debt_ccy, repay_ccy))]
+    fn one_click_repay(&self, debt_ccy: Vec<String>, repay_ccy: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let request = OneClickRepayRequest {
+            debt_ccy,
+            repay_ccy: repay_ccy.to_string(),
+        };
+        self.runtime
+            .block_on(async { map_values(self.client.one_click_repay(request).await) })
+    }
+
+    /// 一键还债历史。
+    #[pyo3(signature = (after=None, before=None, limit=None))]
+    fn get_one_click_repay_history(
+        &self,
+        after: Option<&str>,
+        before: Option<&str>,
+        limit: Option<u32>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime.block_on(async {
+            map_values(
+                self.client
+                    .get_one_click_repay_history(after, before, limit)
+                    .await,
+            )
+        })
+    }
+
+    // ==================== Trade 扩展（mass cancel / cancel-all-after / order-precheck） ====================
+
+    /// 批量撤单（全量撤）。
+    #[pyo3(signature = (payload_json))]
+    fn mass_cancel(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.mass_cancel(payload).await) })
+    }
+
+    /// 定时全撤。
+    #[pyo3(signature = (payload_json))]
+    fn cancel_all_after(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.cancel_all_after(payload).await) })
+    }
+
+    /// 订单预检查。
+    #[pyo3(signature = (payload_json))]
+    fn order_precheck(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.order_precheck(payload).await) })
+    }
+
+    // ==================== Grid / Recurring Buy ====================
+
+    /// 网格策略下单。
+    #[pyo3(signature = (payload_json))]
+    fn grid_order_algo(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.grid_order_algo(payload).await) })
+    }
+
+    /// 网格挂单列表。
+    #[pyo3(signature = (params_json=None))]
+    fn grid_orders_algo_pending(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.grid_orders_algo_pending(params).await) })
+    }
+
+    /// 网格历史订单。
+    #[pyo3(signature = (params_json=None))]
+    fn grid_orders_algo_history(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.grid_orders_algo_history(params).await) })
+    }
+
+    /// 定投下单。
+    #[pyo3(signature = (payload_json))]
+    fn place_recurring_buy_order(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.place_recurring_buy_order(payload).await) })
+    }
+
+    /// 定投挂单列表。
+    #[pyo3(signature = (params_json=None))]
+    fn get_recurring_buy_order_list(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_recurring_buy_order_list(params).await) })
+    }
+
+    // ==================== Copy Trading ====================
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_existing_lead_positions(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_existing_lead_positions(params).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn place_lead_stop_order(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.place_lead_stop_order(payload).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn close_lead_position(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.close_lead_position(payload).await) })
+    }
+
+    fn get_total_profit_sharing(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.get_total_profit_sharing().await) })
+    }
+
+    // ==================== Finance / Staking / Savings / Simple Earn ====================
+
+    #[pyo3(signature = (params_json=None))]
+    fn defi_get_offers(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.defi_get_offers(params).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn defi_purchase(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.defi_purchase(payload).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn saving_balance(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.saving_balance(params).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn saving_purchase_redemption(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.saving_purchase_redemption(payload).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn simple_earn_get_offers(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.simple_earn_get_offers(params).await) })
+    }
+
+    // ==================== Broker ====================
+
+    #[pyo3(signature = (params_json))]
+    fn fd_rebate_per_orders(&self, params_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(Some(params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.fd_rebate_per_orders(params).await) })
+    }
+
+    #[pyo3(signature = (params_json))]
+    fn fd_get_rebate_per_orders(&self, params_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(Some(params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.fd_get_rebate_per_orders(params).await) })
+    }
+
+    // ==================== Block / RFQ ====================
+
+    fn get_rfq_counterparties(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.get_counterparties().await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn create_rfq(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.create_rfq(payload).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn create_quote(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.create_quote(payload).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_rfq(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.cancel_rfq(payload).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_batch_rfqs(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.cancel_batch_rfqs(payload).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_all_rfqs(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.cancel_all_rfqs(payload).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn execute_quote(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.execute_quote(payload).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_rfqs(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_rfqs(params).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_rfq_quotes(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_quotes(params).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_quote(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.cancel_quote(payload).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_batch_quotes(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.cancel_batch_quotes(payload).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_all_quotes(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.cancel_all_quotes(payload).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_rfq_trades(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime.block_on(async {
+            map_values(okx_rest::BlockRfqApi::get_trades(&self.client, params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_rfq_public_trades(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_public_trades(params).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn reset_rfq_mmp(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.reset_mmp(payload).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn set_rfq_mmp_config(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.set_mmp_config(payload).await) })
+    }
+
+    fn get_rfq_mmp_config(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.get_mmp_config().await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn set_rfq_marker_instrument(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.set_marker_instrument(payload).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_rfq_quote_products(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_quote_products(params).await) })
+    }
+
+    // ==================== Spread Trading ====================
+
+    #[pyo3(signature = (payload_json))]
+    fn spread_place_order(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.spread_place_order(payload).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn spread_cancel_order(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.spread_cancel_order(payload).await) })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn spread_cancel_all_orders(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.spread_cancel_all_orders(payload).await) })
+    }
+
+    #[pyo3(signature = (params_json))]
+    fn spread_get_order_details(&self, params_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(Some(params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.spread_get_order_details(params).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn spread_get_active_orders(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.spread_get_active_orders(params).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn spread_get_orders(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.spread_get_orders(params).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn spread_get_trades(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.spread_get_trades(params).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn spread_get_spreads(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.spread_get_spreads(params).await) })
+    }
+
+    #[pyo3(signature = (params_json))]
+    fn spread_get_order_book(&self, params_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(Some(params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.spread_get_order_book(params).await) })
+    }
+
+    #[pyo3(signature = (params_json))]
+    fn spread_get_ticker(&self, params_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(Some(params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.spread_get_ticker(params).await) })
+    }
+
+    #[pyo3(signature = (params_json))]
+    fn spread_get_public_trades(&self, params_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(Some(params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        self.runtime
+            .block_on(async { map_values(self.client.spread_get_public_trades(params).await) })
+    }
+
+    // ==================== Trading Data (Rubik) ====================
+
+    fn get_support_coin(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.get_support_coin().await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_taker_volume(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_taker_volume(params).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_margin_lending_ratio(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_margin_lending_ratio(params).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_long_short_ratio(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_long_short_ratio(params).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_contracts_open_interest_volume(
+        &self,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime.block_on(async {
+            map_values(self.client.get_contracts_open_interest_volume(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_options_open_interest_volume(
+        &self,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime.block_on(async {
+            map_values(self.client.get_options_open_interest_volume(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_put_call_ratio(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_put_call_ratio(params).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_open_interest_volume_expiry(
+        &self,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime.block_on(async {
+            map_values(self.client.get_open_interest_volume_expiry(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_interest_volume_strike(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_interest_volume_strike(params).await) })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_taker_flow(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime
+            .block_on(async { map_values(self.client.get_taker_flow(params).await) })
+    }
+
     // ==================== Market API ====================
 
     /// 查询单个交易对行情。
@@ -2081,8 +3083,7 @@ impl PyOkxClient {
         let parsed_limit = limit.and_then(|v| v.parse::<u32>().ok());
 
         self.runtime.block_on(async {
-            self.client
-                .get_trades(inst_id, parsed_limit)
+            okx_rest::MarketApi::get_trades(&self.client, inst_id, parsed_limit)
                 .await
                 .map(|v| v.into_iter().map(PyPublicTrade::from).collect())
                 .map_err(to_py_err)
@@ -2384,6 +3385,175 @@ impl PyOkxClient {
         })
     }
 
+    /// 查询价格限制 / Get price limit.
+    #[pyo3(signature = (inst_id))]
+    fn get_price_limit(&self, inst_id: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let params = GetPriceLimitParams {
+            inst_id: inst_id.to_string(),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_price_limit(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询期权一览 / Get option summary.
+    #[pyo3(signature = (uly=None, exp_time=None, inst_family=None))]
+    fn get_opt_summary(
+        &self,
+        uly: Option<&str>,
+        exp_time: Option<&str>,
+        inst_family: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = GetOptSummaryParams {
+            uly: uly.map(String::from),
+            exp_time: exp_time.map(String::from),
+            inst_family: inst_family.map(String::from),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_opt_summary(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询预估交割/行权价 / Get estimated delivery/exercise price.
+    #[pyo3(signature = (inst_id))]
+    fn get_estimated_price(&self, inst_id: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let params = GetEstimatedPriceParams {
+            inst_id: inst_id.to_string(),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_estimated_price(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询折算汇率和免息额度 / Get discount rate and interest-free quota.
+    #[pyo3(signature = (ccy=None))]
+    fn get_discount_interest_free_quota(&self, ccy: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = GetDiscountQuotaParams {
+            ccy: ccy.map(String::from),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_discount_interest_free_quota(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询公共利率与借币限额 / Get interest rate and loan quota.
+    fn get_interest_rate_loan_quota(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime.block_on(async {
+            self.client
+                .get_interest_rate_loan_quota()
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询 VIP 利率与借币限额 / Get VIP interest rate and loan quota.
+    fn get_vip_interest_rate_loan_quota(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime.block_on(async {
+            self.client
+                .get_vip_interest_rate_loan_quota()
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询标的列表 / Get underlying list.
+    #[pyo3(signature = (inst_type=None))]
+    fn get_underlying(&self, inst_type: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let params = GetUnderlyingParams {
+            inst_type: inst_type.map(String::from),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_underlying(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询保险基金 / Get insurance fund.
+    #[pyo3(signature = (inst_type=None, type_=None, uly=None, ccy=None, before=None, after=None, limit=None, inst_family=None))]
+    fn get_insurance_fund(
+        &self,
+        inst_type: Option<&str>,
+        type_: Option<&str>,
+        uly: Option<&str>,
+        ccy: Option<&str>,
+        before: Option<&str>,
+        after: Option<&str>,
+        limit: Option<&str>,
+        inst_family: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = GetInsuranceFundParams {
+            inst_type: inst_type.map(String::from),
+            r#type: type_.map(String::from),
+            uly: uly.map(String::from),
+            ccy: ccy.map(String::from),
+            before: before.map(String::from),
+            after: after.map(String::from),
+            limit: limit.map(String::from),
+            inst_family: inst_family.map(String::from),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_insurance_fund(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 合约币种单位换算 / Convert contract coin units.
+    #[pyo3(signature = (type_=None, inst_id=None, sz=None, px=None, unit=None))]
+    fn get_convert_contract_coin(
+        &self,
+        type_: Option<&str>,
+        inst_id: Option<&str>,
+        sz: Option<&str>,
+        px: Option<&str>,
+        unit: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = GetConvertContractCoinParams {
+            r#type: type_.map(String::from),
+            inst_id: inst_id.map(String::from),
+            sz: sz.map(String::from),
+            px: px.map(String::from),
+            unit: unit.map(String::from),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_convert_contract_coin(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
     /// 获取服务器时间戳（毫秒）。
     fn get_system_time(&self) -> PyResult<String> {
         self.runtime.block_on(async {
@@ -2392,6 +3562,18 @@ impl PyOkxClient {
                 .await
                 .map(|v| v.first().map(|t| t.ts.clone()).unwrap_or_default())
                 .map_err(to_py_err)
+        })
+    }
+
+    /// 获取系统状态。
+    #[pyo3(signature = (state=None))]
+    fn get_system_status(&self, state: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime.block_on(async {
+            self.client
+                .get_system_status(state)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
         })
     }
 

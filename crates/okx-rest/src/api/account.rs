@@ -65,6 +65,12 @@ pub mod endpoints {
     pub const SPOT_MANUAL_BORROW_REPAY: &str = "/api/v5/account/spot-manual-borrow-repay";
     /// Spot borrow repay history
     pub const SPOT_BORROW_REPAY_HISTORY: &str = "/api/v5/account/spot-borrow-repay-history";
+    /// 调整持仓保证金
+    pub const ADJUSTMENT_MARGIN: &str = "/api/v5/account/position/margin-balance";
+    /// 设置风险对冲类型
+    pub const SET_RISK_OFFSET_TYPE: &str = "/api/v5/account/set-riskOffset-type";
+    /// 设置自动借币
+    pub const SET_AUTO_LOAN: &str = "/api/v5/account/set-auto-loan";
     /// VIP interest accrued
     pub const VIP_INTEREST_ACCRUED: &str = "/api/v5/account/vip-interest-accrued";
     /// VIP interest deducted
@@ -232,6 +238,21 @@ pub struct MaxAvailSize {
     /// Available sell amount
     #[serde(default)]
     pub avail_sell: String,
+}
+
+/// Query parameters for get_max_loan.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetMaxLoanParams {
+    /// Instrument ID
+    #[serde(rename = "instId")]
+    pub inst_id: String,
+    /// Margin mode
+    #[serde(rename = "mgnMode")]
+    pub mgn_mode: String,
+    /// Margin currency
+    #[serde(rename = "mgnCcy", skip_serializing_if = "Option::is_none")]
+    pub mgn_ccy: Option<String>,
 }
 
 /// Query parameters for get_fee_rates.
@@ -469,6 +490,14 @@ pub struct GetInterestAccruedParams {
     pub limit: Option<String>,
 }
 
+/// Query parameters for interest rate.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetInterestRateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ccy: Option<String>,
+}
+
 /// Query parameters for VIP interest records.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -625,6 +654,40 @@ pub struct SpotBorrowRepayHistoryParams {
     pub limit: Option<String>,
 }
 
+/// 调整持仓保证金请求。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdjustmentMarginRequest {
+    /// 交易对 ID
+    pub inst_id: String,
+    /// 持仓方向
+    pub pos_side: String,
+    /// add / reduce
+    pub r#type: String,
+    /// 调整数量
+    pub amt: String,
+    /// 是否借贷划转
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loan_trans: Option<bool>,
+}
+
+/// 设置风险对冲类型请求。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetRiskOffsetTypeRequest {
+    /// 风险对冲类型
+    pub r#type: String,
+}
+
+/// 设置自动借币请求。
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SetAutoLoanRequest {
+    /// 是否开启自动借币
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_loan: Option<String>,
+}
+
 /// Raw account payload used for untyped endpoints.
 pub type AccountRaw = Value;
 
@@ -743,6 +806,17 @@ pub trait AccountApi {
         params: GetMaxAvailSizeParams,
     ) -> impl std::future::Future<Output = Result<Vec<MaxAvailSize>>> + Send;
 
+    /// Get maximum loan for instrument.
+    ///
+    /// ## API Details
+    ///
+    /// - Endpoint: GET /api/v5/account/max-loan
+    /// - Permission: Read
+    fn get_max_loan(
+        &self,
+        params: GetMaxLoanParams,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
     /// Get fee rates.
     ///
     /// ## API Details
@@ -844,10 +918,39 @@ pub trait AccountApi {
         params: Option<SpotBorrowRepayHistoryParams>,
     ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
 
+    /// 调整持仓保证金。
+    fn adjustment_margin(
+        &self,
+        request: AdjustmentMarginRequest,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 设置风险对冲类型。
+    fn set_risk_offset_type(
+        &self,
+        request: SetRiskOffsetTypeRequest,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 设置自动借币。
+    fn set_auto_loan(
+        &self,
+        request: SetAutoLoanRequest,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
     /// Interest accrued records.
     fn get_interest_accrued(
         &self,
         params: GetInterestAccruedParams,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// Get interest rate.
+    ///
+    /// ## API Details
+    ///
+    /// - Endpoint: GET /api/v5/account/interest-rate
+    /// - Permission: Read
+    fn get_interest_rate(
+        &self,
+        ccy: Option<&str>,
     ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
 
     /// VIP interest accrued records.
@@ -917,6 +1020,10 @@ impl AccountApi for OkxRestClient {
 
     async fn get_max_avail_size(&self, params: GetMaxAvailSizeParams) -> Result<Vec<MaxAvailSize>> {
         self.get(endpoints::MAX_AVAIL_SIZE, Some(&params)).await
+    }
+
+    async fn get_max_loan(&self, params: GetMaxLoanParams) -> Result<Vec<AccountRaw>> {
+        self.get(endpoints::MAX_LOAN, Some(&params)).await
     }
 
     async fn get_fee_rates(&self, params: GetFeeRatesParams) -> Result<Vec<FeeRates>> {
@@ -1001,11 +1108,33 @@ impl AccountApi for OkxRestClient {
             .await
     }
 
+    async fn adjustment_margin(&self, request: AdjustmentMarginRequest) -> Result<Vec<AccountRaw>> {
+        self.post(endpoints::ADJUSTMENT_MARGIN, &request).await
+    }
+
+    async fn set_risk_offset_type(
+        &self,
+        request: SetRiskOffsetTypeRequest,
+    ) -> Result<Vec<AccountRaw>> {
+        self.post(endpoints::SET_RISK_OFFSET_TYPE, &request).await
+    }
+
+    async fn set_auto_loan(&self, request: SetAutoLoanRequest) -> Result<Vec<AccountRaw>> {
+        self.post(endpoints::SET_AUTO_LOAN, &request).await
+    }
+
     async fn get_interest_accrued(
         &self,
         params: GetInterestAccruedParams,
     ) -> Result<Vec<AccountRaw>> {
         self.get(endpoints::INTEREST_ACCRUED, Some(&params)).await
+    }
+
+    async fn get_interest_rate(&self, ccy: Option<&str>) -> Result<Vec<AccountRaw>> {
+        let params = GetInterestRateParams {
+            ccy: ccy.map(|v| v.to_string()),
+        };
+        self.get(endpoints::INTEREST_RATE, Some(&params)).await
     }
 
     async fn get_vip_interest_accrued(

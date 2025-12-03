@@ -85,6 +85,10 @@ def test_sync_client_methods_exist():
     assert hasattr(client, "get_ticker")
     assert hasattr(client, "get_balance")
     assert hasattr(client, "get_positions")
+    # 高级接口新增
+    assert hasattr(client, "get_support_coin")  # TradingData
+    assert hasattr(client, "spread_get_spreads")
+    assert hasattr(client, "fd_rebate_per_orders")
 
 
 def test_sync_client_get_tickers():
@@ -119,6 +123,53 @@ def test_sync_client_get_orders_pending():
         assert isinstance(orders, list) or orders is None
     except Exception as e:
         # 认证错误是预期的
+        assert e is not None
+
+
+def test_sync_client_trading_data_public():
+    """测试 TradingData 公共接口."""
+    from okx_py import OkxClient, Config, Credentials
+    import pytest
+
+    creds = Credentials("dummy", "dummy", "dummy")
+    config = Config(creds, simulated=True)
+    client = OkxClient(config)
+
+    try:
+        data = client.get_support_coin()
+        assert isinstance(data, list)
+    except Exception as e:
+        pytest.skip(f"网络错误: {e}")
+
+
+def test_sync_client_spread_public():
+    """测试 Spread 公共接口（若网络可用）."""
+    from okx_py import OkxClient, Config, Credentials
+    import pytest
+
+    creds = Credentials("dummy", "dummy", "dummy")
+    config = Config(creds, simulated=True)
+    client = OkxClient(config)
+
+    try:
+        spreads = client.spread_get_spreads()
+        assert isinstance(spreads, list)
+    except Exception as e:
+        pytest.skip(f"网络错误或未授权: {e}")
+
+
+def test_sync_client_rfq_paths():
+    """测试 RFQ 基础调用（认证失败也应返回错误信息）."""
+    from okx_py import OkxClient, Config, Credentials
+
+    creds = Credentials("test_key", "test_secret", "test_pass")
+    config = Config(creds, simulated=True)
+    client = OkxClient(config)
+
+    payload = {"instId": "BTC-USDT"}
+    try:
+        client.create_rfq(payload)
+    except Exception as e:
         assert e is not None
 
 

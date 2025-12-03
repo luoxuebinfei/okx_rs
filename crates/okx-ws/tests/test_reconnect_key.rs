@@ -14,3 +14,22 @@ fn channel_key_roundtrip() {
         other => panic!("通道类型不匹配: {other:?}"),
     }
 }
+
+#[test]
+fn channel_key_roundtrip_for_advanced_channels() {
+    let block = Channel::BlockTickers {
+        inst_family: Some("BTC-USD".into()),
+    };
+    let rfqs = Channel::Rfqs {
+        inst_family: Some("BTC-USD".into()),
+    };
+    let recur = Channel::AlgoRecurringBuy {
+        algo_id: Some("123".into()),
+    };
+
+    for ch in [block, rfqs, recur] {
+        let key = channel_key_from(&ch);
+        let restored = channel_from_key(&key).expect("序列化后应能恢复");
+        assert_eq!(restored.name(), ch.name());
+    }
+}

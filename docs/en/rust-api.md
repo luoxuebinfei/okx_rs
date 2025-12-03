@@ -36,7 +36,7 @@ This guide is based on the codebase and the official OKX docs (https://www.okx.c
   - Market (`market.rs`): `/api/v5/market/tickers`, `/ticker`, `/books` (and books5/books50/books-l2-tbt), `/candles`, `/trades`, `/index-tickers`.
   - Public (`public.rs`): `/api/v5/public/instruments`, `/funding-rate`, `/funding-rate-history`, `/system-time`, `/mark-price`.
 - **Return shape**: all methods return `Result<Vec<T>>` (field names match the official responses).
-- **Example**: see `examples/rest_basic.rs`.
+- **Example**: see `crates/okx-rest/examples/rest_basic.rs`.
 
 ### Common market calls (aligned to official Market Data)
 | Need | Official path | Key params | Rust (OkxRestClient) | Python (OkxClient / AsyncOkxClient) |
@@ -65,6 +65,14 @@ This guide is based on the codebase and the official OKX docs (https://www.okx.c
 | Fee rates | `GET /api/v5/account/trade-fee` | `instType` | `client.get_fee_rates(GetFeeRatesParams { inst_type: "SPOT".into(), inst_id: None, uly: None, inst_family: None }).await?` | Not exposed |
 | Position mode | `POST /api/v5/account/set-position-mode` | `posMode` | `client.set_position_mode("long_short_mode").await?` | Not exposed |
 | Position risk | `GET /api/v5/account/account-position-risk` | none | `client.get_account_position_risk().await?` | Not exposed |
+
+### Account advanced & system status
+| Need | Official path | Key params | Rust usage | Python usage |
+| ---- | ------------- | ---------- | ---------- | ------------ |
+| Adjust position margin | `POST /api/v5/account/position/margin-balance` | `instId`, `posSide`, `type` (add/reduce), `amt`, optional `loanTrans` | `client.adjustment_margin(AdjustmentMarginRequest { inst_id, pos_side, r#type, amt, loan_trans }).await?` | `client.adjustment_margin(inst_id, pos_side, type_, amt, loan_trans=None)` / async |
+| Set risk offset type | `POST /api/v5/account/set-riskOffset-type` | `type` | `client.set_risk_offset_type(SetRiskOffsetTypeRequest { r#type }).await?` | `client.set_risk_offset_type(type_)` / async |
+| Set auto-loan | `POST /api/v5/account/set-auto-loan` | optional `autoLoan` string | `client.set_auto_loan(SetAutoLoanRequest { auto_loan }).await?` | `client.set_auto_loan(auto_loan=None)` / async |
+| System status | `GET /api/v5/system/status` | optional `state` (0 normal / 1 maintenance) | `client.get_system_status(Some("0")).await?` | `client.get_system_status(state=None)` / async |
 
 ### Trade (Order)
 | Need | Official path | Key params | Rust usage | Python usage |
@@ -115,7 +123,7 @@ This guide is based on the codebase and the official OKX docs (https://www.okx.c
 - **Auto-reconnect** (`reconnect.rs`)
   - `ReconnectConfig`: `initial_delay`/`max_delay`/`backoff_multiplier`/`max_attempts`/`restore_subscriptions`.
   - `ReconnectingWsClient::connect(config, ConnectionType, reconnect_config)`: tracks subscriptions and exposes `state()` / `is_connected()` / `subscription_count()`.
-- **Examples**: `examples/ws_public.rs` for public subscriptions; Python bindings reference implementation in `crates/okx-py/src/ws_client.rs`.
+- **Examples**: `crates/okx-rest/examples/ws_public.rs` for public subscriptions; Python bindings reference implementation in `crates/okx-py/src/ws_client.rs`.
 
 ### WebSocket common subs
 | Need | Channel | Params | Rust (WsClient) | Python (WsClient binding) |

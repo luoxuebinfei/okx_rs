@@ -32,10 +32,20 @@ pub mod api;
 mod client;
 
 pub use api::account::AccountApi;
+pub use api::block_rfq::BlockRfqApi;
+pub use api::broker::BrokerApi;
+pub use api::convert::ConvertApi;
+pub use api::copy_trading::CopyTradingApi;
+pub use api::finance::FinanceApi;
 pub use api::funding::FundingApi;
+pub use api::grid::GridApi;
 pub use api::market::MarketApi;
 pub use api::public::PublicApi;
+pub use api::spread::SpreadApi;
+pub use api::status::StatusApi;
+pub use api::subaccount::SubaccountApi;
 pub use api::trade::TradeApi;
+pub use api::trading_data::TradingDataApi;
 pub use client::OkxRestClient;
 
 // Re-export core types for convenience

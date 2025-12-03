@@ -37,22 +37,27 @@ PyPI 发布准备见 `docs/zh/release.md`。
 
 ## 覆盖范围与缺失
 - 已暴露（REST）：账户余额、持仓、下单/撤单/查单、待成交、单/多 ticker、合约列表、服务器时间。
-- 未暴露（REST）：账户配置、杠杆/保证金工具、手续费率、订单改价/批量、策略委托、资金（划转/充值/提现等）、资金费率/标记价格等；如需，可参照 `okx-rest` 对应请求结构扩展 PyO3 绑定。
+- 已暴露（高级 REST）：账户配置、杠杆/保证金工具、手续费率、订单改价/批量、策略委托、资金（划转/充值/提现等）、资金费率/标记价格，新增系统状态、调保证金、风险对冲类型、自动借币。
+- 未暴露（REST）：官方仍在更新的少量细分端点如部分经纪特性，可按需在绑定中继续扩展。
 - WebSocket：公共/私有频道订阅已暴露，支持自动重连；如需补充更多频道参数，可在 `ws_client.rs` 中扩展。
 
 ## REST 已暴露方法速查（官方路径）
-| 用途 | 官方路径 | Python 调用 |
-| ---- | -------- | ----------- |
-| 账户余额 | `GET /api/v5/account/balance` | `client.get_balance(ccy=None)` / `await aclient.get_balance()` |
-| 持仓信息 | `GET /api/v5/account/positions` | `client.get_positions(inst_type=None, inst_id=None)` / 异步同名 |
-| 下单 | `POST /api/v5/trade/order` | `client.place_order(inst_id, td_mode, side, ord_type, sz, px=None, cl_ord_id=None)` / 异步同名 |
-| 撤单 | `POST /api/v5/trade/cancel-order` | `client.cancel_order(inst_id, ord_id=None, cl_ord_id=None)` / 异步同名 |
-| 查单 | `GET /api/v5/trade/order` | `client.get_order(inst_id, ord_id=None, cl_ord_id=None)` / 异步同名 |
-| 待成交列表 | `GET /api/v5/trade/orders-pending` | `client.get_orders_pending(inst_type=None, inst_id=None)` / 异步同名 |
-| 单一 ticker | `GET /api/v5/market/ticker` | `client.get_ticker(inst_id)` / 异步同名 |
-| 全部 ticker（按类型） | `GET /api/v5/market/tickers` | `client.get_tickers(inst_type)` / 异步同名 |
-| 合约/币对列表 | `GET /api/v5/public/instruments` | `client.get_instruments(inst_type, inst_id=None)` / 异步同名 |
-| 服务器时间 | `GET /api/v5/public/system-time` | `client.get_system_time()` / 异步同名 |
+| 用途 | 官方路径 | Python 调用 | 参数 |
+| ---- | -------- | ----------- | ---- |
+| 账户余额 | `GET /api/v5/account/balance` | `client.get_balance(ccy=None)` / `await aclient.get_balance()` | `ccy` 可选，逗号分隔 |
+| 持仓信息 | `GET /api/v5/account/positions` | `client.get_positions(inst_type=None, inst_id=None)` / 异步同名 | `inst_type`、`inst_id` 可选 |
+| 下单 | `POST /api/v5/trade/order` | `client.place_order(inst_id, td_mode, side, ord_type, sz, px=None, cl_ord_id=None, …)` / 异步同名 | 必填 `inst_id, td_mode, side, ord_type, sz`；其余可选 |
+| 撤单 | `POST /api/v5/trade/cancel-order` | `client.cancel_order(inst_id, ord_id=None, cl_ord_id=None)` / 异步同名 | `inst_id` 必填，`ord_id` 与 `cl_ord_id` 二选一 |
+| 查单 | `GET /api/v5/trade/order` | `client.get_order(inst_id, ord_id=None, cl_ord_id=None)` / 异步同名 | 同上 |
+| 待成交列表 | `GET /api/v5/trade/orders-pending` | `client.get_orders_pending(inst_type=None, inst_id=None, …)` / 异步同名 | `inst_type` 必填，`inst_id/uly/inst_family/after/before/limit` 可选 |
+| 单一 ticker | `GET /api/v5/market/ticker` | `client.get_ticker(inst_id)` / 异步同名 | `inst_id` 必填 |
+| 全部 ticker（按类型） | `GET /api/v5/market/tickers` | `client.get_tickers(inst_type)` / 异步同名 | `inst_type` 必填 |
+| 合约/币对列表 | `GET /api/v5/public/instruments` | `client.get_instruments(inst_type, inst_id=None)` / 异步同名 | `inst_type` 必填，`inst_id` 可选 |
+| 服务器时间 | `GET /api/v5/public/system-time` | `client.get_system_time()` / 异步同名 | 无 |
+| 系统状态 | `GET /api/v5/system/status` | `client.get_system_status(state=None)` / 异步同名 | `state` 可选（`0` 正常，`1` 维护） |
+| 调整持仓保证金 | `POST /api/v5/account/position/margin-balance` | `client.adjustment_margin(inst_id, pos_side, type_, amt, loan_trans=None)` / 异步同名 | `inst_id`、`pos_side`、`type_`(`add/reduce`)、`amt`，`loan_trans` 可选 |
+| 设置风险对冲类型 | `POST /api/v5/account/set-riskOffset-type` | `client.set_risk_offset_type(type_)` / 异步同名 | `type_` 必填 |
+| 设置自动借币 | `POST /api/v5/account/set-auto-loan` | `client.set_auto_loan(auto_loan=None)` / 异步同名 | `auto_loan` 可选字符串（官方值） |
 
 ## REST 未暴露但已在 Rust 实现（可扩展绑定）
 - 账户：账户配置、杠杆信息/设置、最大下单量、最大可用、手续费率、持仓模式、风险视图等。

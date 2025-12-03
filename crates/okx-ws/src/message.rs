@@ -218,4 +218,83 @@ mod tests {
         assert_eq!(arg.get("timestamp").and_then(|v| v.as_str()), Some("123"));
         assert_eq!(arg.get("sign").and_then(|v| v.as_str()), Some("sig"));
     }
+
+    #[test]
+    fn parse_handles_data_array_and_single_object() {
+        let data_json = json!({
+            "arg": {"channel": "tickers", "instId": "BTC-USDT"},
+            "data": [
+                {"last": "1.1"},
+                {"last": "1.2"}
+            ]
+        })
+        .to_string();
+
+        if let WsMessage::Data { channel, arg, data } = WsMessage::parse(&data_json) {
+            assert_eq!(channel, "tickers");
+            assert_eq!(arg["instId"], "BTC-USDT");
+            assert_eq!(data.len(), 2);
+        } else {
+            panic!("应解析为 Data");
+        }
+
+        let single_json = json!({
+            "arg": {"channel": "tickers", "instId": "ETH-USDT"},
+            "data": {"last": "2.0"}
+        })
+        .to_string();
+
+        if let WsMessage::Data { channel, arg, data } = WsMessage::parse(&single_json) {
+            assert_eq!(channel, "tickers");
+            assert_eq!(arg["instId"], "ETH-USDT");
+            assert_eq!(data.len(), 1);
+            assert_eq!(data[0]["last"], "2.0");
+        } else {
+            panic!("应解析单对象为 Data");
+        }
+    }
+
+    #[test]
+    fn parse_handles_event_and_error_details() {
+        let ok_event = r#"{"event":"subscribe","arg":{"channel":"orders"}}"#;
+        if let WsMessage::Event {
+            event,
+            arg,
+            code,
+            msg,
+            ..
+        } = WsMessage::parse(ok_event)
+        {
+            assert_eq!(event, WsEvent::Subscribe);
+            assert_eq!(arg.unwrap()["channel"], "orders");
+            assert!(code.is_none());
+            assert!(msg.is_none());
+        } else {
+            panic!("应解析为 Event 订阅确认");
+        }
+
+        let err_event = r#"{"event":"error","code":"51000","msg":"invalid","arg":{"foo":"bar"}}"#;
+        let parsed = WsMessage::parse(err_event);
+        assert!(parsed.is_error());
+        let details = parsed.error_details().expect("应有错误详情");
+        assert_eq!(details.0, "51000");
+        assert_eq!(details.1, "invalid");
+    }
+
+    #[test]
+    fn parse_pong_and_unknown_paths() {
+        assert!(matches!(WsMessage::parse("pong"), WsMessage::Pong));
+
+        // 非 JSON 串走 Unknown
+        let msg = WsMessage::parse("not json");
+        if let WsMessage::Unknown(raw) = msg {
+            assert_eq!(raw, "not json");
+        } else {
+            panic!("应解析为 Unknown");
+        }
+
+        // 未知 event 也走 Unknown
+        let msg = WsMessage::parse(r#"{"event":"weird"}"#);
+        assert!(matches!(msg, WsMessage::Unknown(_)));
+    }
 }

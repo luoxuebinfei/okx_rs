@@ -8,13 +8,18 @@ use okx_core::types::{
     AmendOrderRequest, CancelAlgoOrderRequest, CancelOrderRequest, FundsTransferRequest,
     PlaceAlgoOrderRequest, PlaceOrderRequest, WithdrawalRequest,
 };
+use okx_core::types::{
+    ConvertHistoryParams, ConvertTradeRequest, EasyConvertRequest, EstimateQuoteParams,
+    OneClickRepayRequest,
+};
 use okx_rest::api::account::{
-    BorrowRepayHistoryParams, BorrowRepayRequest, GetAccountPositionTiersParams,
-    GetBillsArchiveParams, GetBillsParams, GetFeeRatesParams, GetGreeksParams,
-    GetInterestAccruedParams, GetLeverageInfoParams, GetMaxAvailSizeParams, GetMaxSizeParams,
-    GetMaxWithdrawalParams, GetPositionsHistoryParams, GetPositionsParams,
-    GetSimulatedMarginParams, GetVipInterestParams, PositionBuilderRequest, SetAccountLevelRequest,
-    SetGreeksRequest, SetIsolatedModeRequest, SetLeverageRequest, SpotBorrowRepayHistoryParams,
+    AdjustmentMarginRequest, BorrowRepayHistoryParams, BorrowRepayRequest,
+    GetAccountPositionTiersParams, GetBillsArchiveParams, GetBillsParams, GetFeeRatesParams,
+    GetGreeksParams, GetInterestAccruedParams, GetLeverageInfoParams, GetMaxAvailSizeParams,
+    GetMaxLoanParams, GetMaxSizeParams, GetMaxWithdrawalParams, GetPositionsHistoryParams,
+    GetPositionsParams, GetSimulatedMarginParams, GetVipInterestParams, PositionBuilderRequest,
+    SetAccountLevelRequest, SetAutoLoanRequest, SetGreeksRequest, SetIsolatedModeRequest,
+    SetLeverageRequest, SetRiskOffsetTypeRequest, SpotBorrowRepayHistoryParams,
     SpotManualBorrowRepayRequest,
 };
 use okx_rest::api::funding::{
@@ -30,18 +35,30 @@ use okx_rest::api::market::{
     GetIndexTickersParams, GetMarkPriceCandlesParams, GetTickersParams,
 };
 use okx_rest::api::public::{
-    GetDeliveryExerciseHistoryParams, GetFundingRateHistoryParams, GetInstrumentsParams,
-    GetMarkPriceParams, GetOpenInterestParams, GetPositionTiersParams,
+    GetConvertContractCoinParams, GetDeliveryExerciseHistoryParams, GetDiscountQuotaParams,
+    GetEstimatedPriceParams, GetFundingRateHistoryParams, GetInstrumentsParams,
+    GetInsuranceFundParams, GetMarkPriceParams, GetOpenInterestParams, GetOptSummaryParams,
+    GetPositionTiersParams, GetPriceLimitParams, GetUnderlyingParams,
+};
+use okx_rest::api::subaccount::{
+    ResetSubaccountApikeyRequest, SetTransferOutRequest, SetVipLoanRequest, SubaccountBillsParams,
+    SubaccountInterestParams, SubaccountListParams, SubaccountTransferRequest,
 };
 use okx_rest::api::trade::{
     AmendAlgoOrderRequest, ClosePositionRequest, GetAlgoOrderDetailsParams,
     GetAlgoOrdersHistoryParams, GetAlgoOrdersParams, GetFillsHistoryParams, GetFillsParams,
     GetOrderParams, GetOrdersHistoryArchiveParams, GetOrdersHistoryParams, GetOrdersPendingParams,
 };
-use okx_rest::{AccountApi, FundingApi, MarketApi, OkxRestClient, PublicApi, TradeApi};
+use okx_rest::{
+    AccountApi, BlockRfqApi, BrokerApi, ConvertApi, CopyTradingApi, FinanceApi, FundingApi,
+    GridApi, MarketApi, OkxRestClient, PublicApi, SpreadApi, StatusApi, SubaccountApi, TradeApi,
+    TradingDataApi,
+};
 
 use crate::types::*;
-use crate::{parse_json_array, parse_json_value, to_py_err, values_to_py_list};
+use crate::{
+    map_values, parse_json_array, parse_json_value, to_py_err, values_to_py_list, PyRuntimeError,
+};
 
 /// Async Python wrapper for OKX REST client.
 ///
@@ -261,6 +278,48 @@ impl PyAsyncOkxClient {
                 .await
                 .map(|mut v| v.pop().map(PyMaxAvailSize::from))
                 .map_err(to_py_err)
+        })
+    }
+
+    /// 查询最大可借（异步）。
+    #[pyo3(signature = (inst_id, mgn_mode, mgn_ccy=None))]
+    fn get_max_loan<'py>(
+        &self,
+        py: Python<'py>,
+        inst_id: String,
+        mgn_mode: String,
+        mgn_ccy: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = GetMaxLoanParams {
+            inst_id,
+            mgn_mode,
+            mgn_ccy,
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_max_loan(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询借贷利率（异步）。
+    #[pyo3(signature = (ccy=None))]
+    fn get_interest_rate<'py>(
+        &self,
+        py: Python<'py>,
+        ccy: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_interest_rate(ccy.as_deref())
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
         })
     }
 
@@ -518,6 +577,72 @@ impl PyAsyncOkxClient {
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             client
                 .set_isolated_mode(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 调整持仓保证金（异步）。
+    #[pyo3(signature = (inst_id, pos_side, type_, amt, loan_trans=None))]
+    fn adjustment_margin<'py>(
+        &self,
+        py: Python<'py>,
+        inst_id: String,
+        pos_side: String,
+        type_: String,
+        amt: String,
+        loan_trans: Option<bool>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = AdjustmentMarginRequest {
+            inst_id,
+            pos_side,
+            r#type: type_,
+            amt,
+            loan_trans,
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .adjustment_margin(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 设置风险对冲类型（异步）。
+    fn set_risk_offset_type<'py>(
+        &self,
+        py: Python<'py>,
+        type_: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = SetRiskOffsetTypeRequest { r#type: type_ };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .set_risk_offset_type(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 设置自动借币（异步）。
+    #[pyo3(signature = (auto_loan=None))]
+    fn set_auto_loan<'py>(
+        &self,
+        py: Python<'py>,
+        auto_loan: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = SetAutoLoanRequest { auto_loan };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .set_auto_loan(request)
                 .await
                 .map_err(to_py_err)
                 .and_then(values_to_py_list)
@@ -1143,6 +1268,73 @@ impl PyAsyncOkxClient {
                 .amend_order(request)
                 .await
                 .map(|mut v| v.pop().map(PyAmendOrderResult::from))
+                .map_err(to_py_err)
+        })
+    }
+
+    /// 批量改单（异步）。
+    #[pyo3(signature = (orders))]
+    fn amend_batch_orders<'py>(
+        &self,
+        py: Python<'py>,
+        orders: Vec<(
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        )>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let requests: Vec<AmendOrderRequest> = orders
+                .into_iter()
+                .map(
+                    |(
+                        inst_id,
+                        ord_id,
+                        cl_ord_id,
+                        req_id,
+                        new_sz,
+                        new_px,
+                        new_tp_trigger_px,
+                        new_tp_ord_px,
+                        new_sl_trigger_px,
+                        new_sl_ord_px,
+                        new_tp_trigger_px_type,
+                        new_sl_trigger_px_type,
+                    )| AmendOrderRequest {
+                        inst_id,
+                        ord_id,
+                        cl_ord_id,
+                        req_id,
+                        new_sz,
+                        new_px,
+                        new_tp_trigger_px,
+                        new_tp_ord_px,
+                        new_sl_trigger_px,
+                        new_sl_ord_px,
+                        new_tp_trigger_px_type,
+                        new_sl_trigger_px_type,
+                    },
+                )
+                .collect();
+
+            client
+                .amend_batch_orders(requests)
+                .await
+                .map(|v| {
+                    v.into_iter()
+                        .map(PyAmendOrderResult::from)
+                        .collect::<Vec<_>>()
+                })
                 .map_err(to_py_err)
         })
     }
@@ -2150,6 +2342,1219 @@ impl PyAsyncOkxClient {
         })
     }
 
+    // ==================== SubAccount API (async) ====================
+
+    #[pyo3(signature = (sub_acct))]
+    fn get_subaccount_balance<'py>(
+        &self,
+        py: Python<'py>,
+        sub_acct: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_subaccount_balance(&sub_acct).await)
+        })
+    }
+
+    #[pyo3(signature = (ccy=None, bill_type=None, sub_acct=None, after=None, before=None, limit=None))]
+    fn get_subaccount_bills<'py>(
+        &self,
+        py: Python<'py>,
+        ccy: Option<String>,
+        bill_type: Option<String>,
+        sub_acct: Option<String>,
+        after: Option<String>,
+        before: Option<String>,
+        limit: Option<u32>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = SubaccountBillsParams {
+            ccy,
+            bill_type,
+            sub_acct,
+            after,
+            before,
+            limit,
+        };
+        let params = if params.ccy.is_some()
+            || params.bill_type.is_some()
+            || params.sub_acct.is_some()
+            || params.after.is_some()
+            || params.before.is_some()
+            || params.limit.is_some()
+        {
+            Some(params)
+        } else {
+            None
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_subaccount_bills(params).await)
+        })
+    }
+
+    #[pyo3(signature = (sub_acct, api_key, label, perm, ip=None))]
+    fn reset_subaccount_apikey<'py>(
+        &self,
+        py: Python<'py>,
+        sub_acct: String,
+        api_key: String,
+        label: String,
+        perm: String,
+        ip: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = ResetSubaccountApikeyRequest {
+            sub_acct,
+            api_key,
+            label,
+            perm,
+            ip,
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.reset_subaccount_apikey(request).await)
+        })
+    }
+
+    #[pyo3(signature = (enable=None, sub_acct=None, after=None, before=None, limit=None))]
+    fn get_subaccount_list<'py>(
+        &self,
+        py: Python<'py>,
+        enable: Option<bool>,
+        sub_acct: Option<String>,
+        after: Option<String>,
+        before: Option<String>,
+        limit: Option<u32>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = SubaccountListParams {
+            enable,
+            sub_acct,
+            after,
+            before,
+            limit,
+        };
+        let params = if params.enable.is_some()
+            || params.sub_acct.is_some()
+            || params.after.is_some()
+            || params.before.is_some()
+            || params.limit.is_some()
+        {
+            Some(params)
+        } else {
+            None
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_subaccount_list(params).await)
+        })
+    }
+
+    #[pyo3(signature = (ccy, amt, froms, to, from_sub_account, to_sub_account, loan_trans=None, omit_pos_risk=None))]
+    fn subaccount_transfer<'py>(
+        &self,
+        py: Python<'py>,
+        ccy: String,
+        amt: String,
+        froms: String,
+        to: String,
+        from_sub_account: String,
+        to_sub_account: String,
+        loan_trans: Option<bool>,
+        omit_pos_risk: Option<bool>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = SubaccountTransferRequest {
+            ccy,
+            amt,
+            froms,
+            to,
+            from_sub_account,
+            to_sub_account,
+            loan_trans,
+            omit_pos_risk,
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.subaccount_transfer(request).await)
+        })
+    }
+
+    #[pyo3(signature = (sub_acct=None))]
+    fn get_entrust_subaccount_list<'py>(
+        &self,
+        py: Python<'py>,
+        sub_acct: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(
+                client
+                    .get_entrust_subaccount_list(sub_acct.as_deref())
+                    .await,
+            )
+        })
+    }
+
+    #[pyo3(signature = (sub_acct, can_trans_out))]
+    fn set_permission_transfer_out<'py>(
+        &self,
+        py: Python<'py>,
+        sub_acct: String,
+        can_trans_out: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = SetTransferOutRequest {
+            sub_acct,
+            can_trans_out,
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.set_permission_transfer_out(request).await)
+        })
+    }
+
+    #[pyo3(signature = (sub_acct, ccy=None))]
+    fn get_subaccount_funding_balance<'py>(
+        &self,
+        py: Python<'py>,
+        sub_acct: String,
+        ccy: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_funding_balance(&sub_acct, ccy.as_deref()).await)
+        })
+    }
+
+    #[pyo3(signature = (api_key))]
+    fn get_affiliate_rebate_info<'py>(
+        &self,
+        py: Python<'py>,
+        api_key: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_affiliate_rebate_info(&api_key).await)
+        })
+    }
+
+    #[pyo3(signature = (enable, alloc_json))]
+    fn set_sub_accounts_vip_loan<'py>(
+        &self,
+        py: Python<'py>,
+        enable: bool,
+        alloc_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let alloc =
+            parse_json_value(Some(&alloc_json), "alloc")?.unwrap_or_else(|| serde_json::json!([]));
+        let request = SetVipLoanRequest { enable, alloc };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.set_sub_accounts_vip_loan(request).await)
+        })
+    }
+
+    #[pyo3(signature = (sub_acct=None, ccy=None))]
+    fn get_sub_account_borrow_interest_and_limit<'py>(
+        &self,
+        py: Python<'py>,
+        sub_acct: Option<String>,
+        ccy: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = SubaccountInterestParams { sub_acct, ccy };
+        let params = if params.sub_acct.is_some() || params.ccy.is_some() {
+            Some(params)
+        } else {
+            None
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(
+                client
+                    .get_sub_account_borrow_interest_and_limit(params)
+                    .await,
+            )
+        })
+    }
+
+    // ==================== Convert / Easy Convert / One-Click Repay (async) ====================
+
+    fn get_convert_currencies<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_convert_currencies().await)
+        })
+    }
+
+    #[pyo3(signature = (from_ccy, to_ccy))]
+    fn get_convert_currency_pair<'py>(
+        &self,
+        py: Python<'py>,
+        from_ccy: String,
+        to_ccy: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_convert_currency_pair(&from_ccy, &to_ccy).await)
+        })
+    }
+
+    #[pyo3(signature = (base_ccy, quote_ccy, side, rfq_sz, rfq_sz_ccy, cl_q_req_id=None, tag=None))]
+    fn estimate_convert_quote<'py>(
+        &self,
+        py: Python<'py>,
+        base_ccy: String,
+        quote_ccy: String,
+        side: String,
+        rfq_sz: String,
+        rfq_sz_ccy: String,
+        cl_q_req_id: Option<String>,
+        tag: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = EstimateQuoteParams {
+            base_ccy,
+            quote_ccy,
+            side,
+            rfq_sz,
+            rfq_sz_ccy,
+            cl_q_req_id,
+            tag,
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.estimate_convert_quote(params).await)
+        })
+    }
+
+    #[pyo3(signature = (quote_id, base_ccy, quote_ccy, side, sz, sz_ccy, cl_t_req_id=None, tag=None))]
+    fn convert_trade<'py>(
+        &self,
+        py: Python<'py>,
+        quote_id: String,
+        base_ccy: String,
+        quote_ccy: String,
+        side: String,
+        sz: String,
+        sz_ccy: String,
+        cl_t_req_id: Option<String>,
+        tag: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = ConvertTradeRequest {
+            quote_id,
+            base_ccy,
+            quote_ccy,
+            side,
+            sz,
+            sz_ccy,
+            cl_t_req_id,
+            tag,
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.convert_trade(request).await)
+        })
+    }
+
+    #[pyo3(signature = (after=None, before=None, limit=None, tag=None))]
+    fn get_convert_history<'py>(
+        &self,
+        py: Python<'py>,
+        after: Option<String>,
+        before: Option<String>,
+        limit: Option<u32>,
+        tag: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = ConvertHistoryParams {
+            after,
+            before,
+            limit,
+            tag,
+        };
+        let params = if params.after.is_some()
+            || params.before.is_some()
+            || params.limit.is_some()
+            || params.tag.is_some()
+        {
+            Some(params)
+        } else {
+            None
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_convert_history(params).await)
+        })
+    }
+
+    fn get_easy_convert_currency_list<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_easy_convert_currency_list().await)
+        })
+    }
+
+    #[pyo3(signature = (from_ccy, to_ccy))]
+    fn easy_convert<'py>(
+        &self,
+        py: Python<'py>,
+        from_ccy: Vec<String>,
+        to_ccy: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = EasyConvertRequest { from_ccy, to_ccy };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.easy_convert(request).await)
+        })
+    }
+
+    #[pyo3(signature = (after=None, before=None, limit=None))]
+    fn get_easy_convert_history<'py>(
+        &self,
+        py: Python<'py>,
+        after: Option<String>,
+        before: Option<String>,
+        limit: Option<u32>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(
+                client
+                    .get_easy_convert_history(after.as_deref(), before.as_deref(), limit)
+                    .await,
+            )
+        })
+    }
+
+    fn get_one_click_repay_currency_list<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_one_click_repay_currency_list().await)
+        })
+    }
+
+    #[pyo3(signature = (debt_ccy, repay_ccy))]
+    fn one_click_repay<'py>(
+        &self,
+        py: Python<'py>,
+        debt_ccy: Vec<String>,
+        repay_ccy: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = OneClickRepayRequest {
+            debt_ccy,
+            repay_ccy,
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.one_click_repay(request).await)
+        })
+    }
+
+    #[pyo3(signature = (after=None, before=None, limit=None))]
+    fn get_one_click_repay_history<'py>(
+        &self,
+        py: Python<'py>,
+        after: Option<String>,
+        before: Option<String>,
+        limit: Option<u32>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(
+                client
+                    .get_one_click_repay_history(after.as_deref(), before.as_deref(), limit)
+                    .await,
+            )
+        })
+    }
+
+    // ==================== Trade 扩展（mass cancel / cancel-all-after / order-precheck） ====================
+
+    #[pyo3(signature = (payload_json))]
+    fn mass_cancel<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.mass_cancel(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_all_after<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.cancel_all_after(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn order_precheck<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.order_precheck(payload).await)
+        })
+    }
+
+    // ==================== Grid / Recurring Buy (async) ====================
+
+    #[pyo3(signature = (payload_json))]
+    fn grid_order_algo<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.grid_order_algo(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn grid_orders_algo_pending<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.grid_orders_algo_pending(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn grid_orders_algo_history<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.grid_orders_algo_history(params).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn place_recurring_buy_order<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.place_recurring_buy_order(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_recurring_buy_order_list<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_recurring_buy_order_list(params).await)
+        })
+    }
+
+    // ==================== Copy Trading (async) ====================
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_existing_lead_positions<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_existing_lead_positions(params).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn place_lead_stop_order<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.place_lead_stop_order(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn close_lead_position<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.close_lead_position(payload).await)
+        })
+    }
+
+    fn get_total_profit_sharing<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_total_profit_sharing().await)
+        })
+    }
+
+    // ==================== Broker (async) ====================
+
+    #[pyo3(signature = (params_json))]
+    fn fd_rebate_per_orders<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(Some(&params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.fd_rebate_per_orders(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json))]
+    fn fd_get_rebate_per_orders<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(Some(&params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.fd_get_rebate_per_orders(params).await)
+        })
+    }
+
+    // ==================== Finance / Savings / Simple Earn (async) ====================
+
+    #[pyo3(signature = (params_json=None))]
+    fn defi_get_offers<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.defi_get_offers(params).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn defi_purchase<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.defi_purchase(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn saving_balance<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.saving_balance(params).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn saving_purchase_redemption<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.saving_purchase_redemption(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn simple_earn_get_offers<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.simple_earn_get_offers(params).await)
+        })
+    }
+
+    // ==================== Block / RFQ (async) ====================
+
+    fn get_rfq_counterparties<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_counterparties().await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn create_rfq<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.create_rfq(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_rfq<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.cancel_rfq(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_batch_rfqs<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.cancel_batch_rfqs(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_all_rfqs<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.cancel_all_rfqs(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn create_quote<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.create_quote(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_quote<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.cancel_quote(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_batch_quotes<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.cancel_batch_quotes(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn cancel_all_quotes<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.cancel_all_quotes(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn execute_quote<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.execute_quote(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_rfqs<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_rfqs(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_rfq_quotes<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_quotes(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_rfq_trades<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(okx_rest::BlockRfqApi::get_trades(client.as_ref(), params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_rfq_public_trades<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(okx_rest::BlockRfqApi::get_public_trades(client.as_ref(), params).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn reset_rfq_mmp<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.reset_mmp(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn set_rfq_mmp_config<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.set_mmp_config(payload).await)
+        })
+    }
+
+    fn get_rfq_mmp_config<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_mmp_config().await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn set_rfq_marker_instrument<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.set_marker_instrument(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_rfq_quote_products<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_quote_products(params).await)
+        })
+    }
+
+    // ==================== Spread Trading (async) ====================
+
+    #[pyo3(signature = (payload_json))]
+    fn spread_place_order<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.spread_place_order(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn spread_cancel_order<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.spread_cancel_order(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn spread_cancel_all_orders<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.spread_cancel_all_orders(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json))]
+    fn spread_get_order_details<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(Some(&params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.spread_get_order_details(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn spread_get_active_orders<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.spread_get_active_orders(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn spread_get_orders<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.spread_get_orders(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn spread_get_trades<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.spread_get_trades(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn spread_get_spreads<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.spread_get_spreads(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json))]
+    fn spread_get_order_book<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(Some(&params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.spread_get_order_book(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json))]
+    fn spread_get_ticker<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(Some(&params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.spread_get_ticker(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json))]
+    fn spread_get_public_trades<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(Some(&params_json), "params")?
+            .ok_or_else(|| PyRuntimeError::new_err("params 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.spread_get_public_trades(params).await)
+        })
+    }
+
+    // ==================== Trading Data (async) ====================
+
+    fn get_support_coin<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_support_coin().await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_taker_volume<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_taker_volume(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_margin_lending_ratio<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_margin_lending_ratio(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_long_short_ratio<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_long_short_ratio(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_contracts_open_interest_volume<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_contracts_open_interest_volume(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_options_open_interest_volume<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_options_open_interest_volume(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_put_call_ratio<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_put_call_ratio(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_open_interest_volume_expiry<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_open_interest_volume_expiry(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_interest_volume_strike<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_interest_volume_strike(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn get_taker_flow<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.get_taker_flow(params).await)
+        })
+    }
+
     // ==================== Market API ====================
 
     /// 查询单个交易对行情（异步）。
@@ -2352,8 +3757,7 @@ impl PyAsyncOkxClient {
         let instrument = inst_id;
 
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            client
-                .get_trades(&instrument, parsed_limit)
+            okx_rest::MarketApi::get_trades(client.as_ref(), &instrument, parsed_limit)
                 .await
                 .map(|v| v.into_iter().map(PyPublicTrade::from).collect::<Vec<_>>())
                 .map_err(to_py_err)
@@ -2701,6 +4105,194 @@ impl PyAsyncOkxClient {
         })
     }
 
+    /// 查询价格限制 / Get price limit (async).
+    #[pyo3(signature = (inst_id))]
+    fn get_price_limit<'py>(
+        &self,
+        py: Python<'py>,
+        inst_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = GetPriceLimitParams { inst_id };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_price_limit(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询期权一览 / Get option summary (async).
+    #[pyo3(signature = (uly=None, exp_time=None, inst_family=None))]
+    fn get_opt_summary<'py>(
+        &self,
+        py: Python<'py>,
+        uly: Option<String>,
+        exp_time: Option<String>,
+        inst_family: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = GetOptSummaryParams {
+            uly,
+            exp_time,
+            inst_family,
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_opt_summary(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询预估交割/行权价 / Get estimated delivery/exercise price (async).
+    #[pyo3(signature = (inst_id))]
+    fn get_estimated_price<'py>(
+        &self,
+        py: Python<'py>,
+        inst_id: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = GetEstimatedPriceParams { inst_id };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_estimated_price(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询折算汇率与免息额度 / Get discount rate and interest-free quota (async).
+    #[pyo3(signature = (ccy=None))]
+    fn get_discount_interest_free_quota<'py>(
+        &self,
+        py: Python<'py>,
+        ccy: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = GetDiscountQuotaParams { ccy };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_discount_interest_free_quota(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询公共利率与借币限额 / Get interest rate and loan quota (async).
+    fn get_interest_rate_loan_quota<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_interest_rate_loan_quota()
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询 VIP 利率与借币限额 / Get VIP interest rate and loan quota (async).
+    fn get_vip_interest_rate_loan_quota<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_vip_interest_rate_loan_quota()
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询标的列表 / Get underlying list (async).
+    #[pyo3(signature = (inst_type=None))]
+    fn get_underlying<'py>(
+        &self,
+        py: Python<'py>,
+        inst_type: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = GetUnderlyingParams { inst_type };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_underlying(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 查询保险基金 / Get insurance fund (async).
+    #[pyo3(signature = (inst_type=None, type_=None, uly=None, ccy=None, before=None, after=None, limit=None, inst_family=None))]
+    fn get_insurance_fund<'py>(
+        &self,
+        py: Python<'py>,
+        inst_type: Option<String>,
+        type_: Option<String>,
+        uly: Option<String>,
+        ccy: Option<String>,
+        before: Option<String>,
+        after: Option<String>,
+        limit: Option<String>,
+        inst_family: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = GetInsuranceFundParams {
+            inst_type,
+            r#type: type_,
+            uly,
+            ccy,
+            before,
+            after,
+            limit,
+            inst_family,
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_insurance_fund(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 合约币种单位换算 / Convert contract coin units (async).
+    #[pyo3(signature = (type_=None, inst_id=None, sz=None, px=None, unit=None))]
+    fn get_convert_contract_coin<'py>(
+        &self,
+        py: Python<'py>,
+        type_: Option<String>,
+        inst_id: Option<String>,
+        sz: Option<String>,
+        px: Option<String>,
+        unit: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = GetConvertContractCoinParams {
+            r#type: type_,
+            inst_id,
+            sz,
+            px,
+            unit,
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_convert_contract_coin(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
     /// 获取服务器时间戳（异步，毫秒）。
     fn get_system_time<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = Arc::clone(&self.client);
@@ -2710,6 +4302,23 @@ impl PyAsyncOkxClient {
                 .await
                 .map(|v| v.first().map(|t| t.ts.clone()).unwrap_or_default())
                 .map_err(to_py_err)
+        })
+    }
+
+    /// 获取系统状态（异步）。
+    #[pyo3(signature = (state=None))]
+    fn get_system_status<'py>(
+        &self,
+        py: Python<'py>,
+        state: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_system_status(state.as_deref())
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
         })
     }
 

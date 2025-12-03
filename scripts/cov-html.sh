@@ -50,8 +50,8 @@ cd "${ROOT_DIR}"
 echo "==> 清理旧覆盖数据"
 CARGO_TARGET_DIR="${TARGET_DIR}" cargo llvm-cov clean --workspace
 
-echo "==> 运行工作区 Rust 测试（插桩，不生成报告）"
-CARGO_TARGET_DIR="${TARGET_DIR}" cargo llvm-cov --workspace --no-report
+echo "==> 运行工作区 Rust 测试（插桩，不生成报告，排除 okx-py cdylib）"
+CARGO_TARGET_DIR="${TARGET_DIR}" cargo llvm-cov --workspace --exclude okx-py --no-report
 
 echo "==> 构建带覆盖率的 PyO3 扩展 (maturin develop)"
 LLVM_PROFILE_FILE="${TARGET_DIR}/okx-py-build-%p-%m.profraw" \

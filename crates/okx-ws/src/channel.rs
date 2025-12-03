@@ -183,9 +183,155 @@ pub enum Channel {
         inst_id: Option<String>,
     },
 
+    /// Fills channel - execution updates
+    #[serde(rename = "fills")]
+    Fills {
+        /// Instrument type: SPOT, MARGIN, SWAP, FUTURES, OPTION
+        #[serde(rename = "instType")]
+        inst_type: String,
+        /// Instrument family (optional)
+        #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
+        inst_family: Option<String>,
+        /// Instrument ID (optional)
+        #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
+        inst_id: Option<String>,
+    },
+
     /// Balance and position channel - combined updates
     #[serde(rename = "balance_and_position")]
     BalanceAndPosition,
+
+    /// Grid algo orders channel
+    #[serde(rename = "grid-orders")]
+    GridOrders {
+        #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
+        algo_id: Option<String>,
+        #[serde(rename = "instType", skip_serializing_if = "Option::is_none")]
+        inst_type: Option<String>,
+        #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
+        inst_id: Option<String>,
+    },
+
+    /// Copy trading lead notifications channel
+    #[serde(rename = "copytrading-lead-notify")]
+    CopyTradingLeadNotify {
+        #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
+        inst_id: Option<String>,
+    },
+
+    /// Recurring buy orders channel
+    #[serde(rename = "recurring-orders")]
+    RecurringOrders {
+        #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
+        algo_id: Option<String>,
+    },
+
+    /// Block trading RFQs（business私有）
+    #[serde(rename = "rfqs")]
+    Rfqs {
+        #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
+        inst_family: Option<String>,
+    },
+
+    /// Block trading quotes（business私有）
+    #[serde(rename = "quotes")]
+    Quotes {
+        #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
+        inst_family: Option<String>,
+    },
+
+    /// 结构化大宗成交（私有）
+    #[serde(rename = "struc-block-trades")]
+    StrucBlockTrades {
+        #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
+        inst_family: Option<String>,
+    },
+
+    /// 公开结构化大宗成交（公共）
+    #[serde(rename = "public-struc-block-trades")]
+    PublicStrucBlockTrades {
+        #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
+        inst_family: Option<String>,
+    },
+
+    /// 公开大宗成交（公共）
+    #[serde(rename = "public-block-trades")]
+    PublicBlockTrades {
+        #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
+        inst_family: Option<String>,
+    },
+
+    /// Block Tickers（公共）
+    #[serde(rename = "block-tickers")]
+    BlockTickers {
+        #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
+        inst_family: Option<String>,
+    },
+
+    /// 高级算法频道（私有）
+    #[serde(rename = "algo-advance")]
+    AlgoAdvance {
+        #[serde(rename = "instType", skip_serializing_if = "Option::is_none")]
+        inst_type: Option<String>,
+        #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
+        inst_family: Option<String>,
+        #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
+        inst_id: Option<String>,
+    },
+
+    /// 现货网格订单（私有）
+    #[serde(rename = "grid-orders-spot")]
+    GridOrdersSpot {
+        #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
+        algo_id: Option<String>,
+        #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
+        inst_id: Option<String>,
+    },
+
+    /// 合约网格订单（私有）
+    #[serde(rename = "grid-orders-contract")]
+    GridOrdersContract {
+        #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
+        algo_id: Option<String>,
+        #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
+        inst_id: Option<String>,
+    },
+
+    /// 月亮网格订单（私有）
+    #[serde(rename = "grid-orders-moon")]
+    GridOrdersMoon {
+        #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
+        algo_id: Option<String>,
+        #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
+        inst_id: Option<String>,
+    },
+
+    /// 网格仓位（私有）
+    #[serde(rename = "grid-positions")]
+    GridPositions {
+        #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
+        algo_id: Option<String>,
+        #[serde(rename = "instType", skip_serializing_if = "Option::is_none")]
+        inst_type: Option<String>,
+        #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
+        inst_id: Option<String>,
+    },
+
+    /// 网格子订单（私有）
+    #[serde(rename = "grid-sub-orders")]
+    GridSubOrders {
+        #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
+        algo_id: Option<String>,
+        #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
+        inst_id: Option<String>,
+    },
+
+    /// 定投订单（私有）
+    #[serde(rename = "algo-recurring-buy")]
+    AlgoRecurringBuy {
+        #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
+        algo_id: Option<String>,
+    },
 }
 
 impl Channel {
@@ -198,6 +344,20 @@ impl Channel {
                 | Self::Positions { .. }
                 | Self::Orders { .. }
                 | Self::OrdersAlgo { .. }
+                | Self::AlgoAdvance { .. }
+                | Self::Fills { .. }
+                | Self::GridOrders { .. }
+                | Self::GridOrdersSpot { .. }
+                | Self::GridOrdersContract { .. }
+                | Self::GridOrdersMoon { .. }
+                | Self::GridPositions { .. }
+                | Self::GridSubOrders { .. }
+                | Self::CopyTradingLeadNotify { .. }
+                | Self::RecurringOrders { .. }
+                | Self::AlgoRecurringBuy { .. }
+                | Self::Rfqs { .. }
+                | Self::Quotes { .. }
+                | Self::StrucBlockTrades { .. }
                 | Self::BalanceAndPosition
         )
     }
@@ -225,7 +385,24 @@ impl Channel {
             Self::Positions { .. } => "positions",
             Self::Orders { .. } => "orders",
             Self::OrdersAlgo { .. } => "orders-algo",
+            Self::AlgoAdvance { .. } => "algo-advance",
+            Self::Fills { .. } => "fills",
             Self::BalanceAndPosition => "balance_and_position",
+            Self::GridOrders { .. } => "grid-orders",
+            Self::GridOrdersSpot { .. } => "grid-orders-spot",
+            Self::GridOrdersContract { .. } => "grid-orders-contract",
+            Self::GridOrdersMoon { .. } => "grid-orders-moon",
+            Self::GridPositions { .. } => "grid-positions",
+            Self::GridSubOrders { .. } => "grid-sub-orders",
+            Self::CopyTradingLeadNotify { .. } => "copytrading-lead-notify",
+            Self::RecurringOrders { .. } => "recurring-orders",
+            Self::AlgoRecurringBuy { .. } => "algo-recurring-buy",
+            Self::Rfqs { .. } => "rfqs",
+            Self::Quotes { .. } => "quotes",
+            Self::StrucBlockTrades { .. } => "struc-block-trades",
+            Self::PublicStrucBlockTrades { .. } => "public-struc-block-trades",
+            Self::PublicBlockTrades { .. } => "public-block-trades",
+            Self::BlockTickers { .. } => "block-tickers",
         }
     }
 }

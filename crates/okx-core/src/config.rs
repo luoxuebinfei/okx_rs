@@ -142,3 +142,47 @@ impl Config {
         self.proxy_url.as_deref()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        REST_API_URL, WS_PRIVATE_URL, WS_PRIVATE_URL_SIMULATED, WS_PUBLIC_URL,
+        WS_PUBLIC_URL_SIMULATED,
+    };
+
+    #[test]
+    fn default_config_uses_prod_urls_and_defaults() {
+        let cfg = Config::new(Credentials::new("k", "s", "p"));
+        assert_eq!(cfg.rest_url(), REST_API_URL);
+        assert_eq!(cfg.ws_public_url(), WS_PUBLIC_URL);
+        assert_eq!(cfg.ws_private_url(), WS_PRIVATE_URL);
+        assert!(!cfg.is_simulated());
+        assert_eq!(cfg.timeout_secs(), 30);
+        assert!(cfg.proxy_url().is_none());
+    }
+
+    #[test]
+    fn simulated_switches_ws_urls() {
+        let cfg = Config::new(Credentials::new("k", "s", "p")).simulated(true);
+        assert!(cfg.is_simulated());
+        assert_eq!(cfg.ws_public_url(), WS_PUBLIC_URL_SIMULATED);
+        assert_eq!(cfg.ws_private_url(), WS_PRIVATE_URL_SIMULATED);
+    }
+
+    #[test]
+    fn custom_overrides_are_applied() {
+        let cfg = Config::new(Credentials::new("k", "s", "p"))
+            .with_rest_url("https://alt.com")
+            .with_ws_public_url("wss://pub")
+            .with_ws_private_url("wss://pri")
+            .with_timeout_secs(5)
+            .with_proxy("http://127.0.0.1:7890");
+
+        assert_eq!(cfg.rest_url(), "https://alt.com");
+        assert_eq!(cfg.ws_public_url(), "wss://pub");
+        assert_eq!(cfg.ws_private_url(), "wss://pri");
+        assert_eq!(cfg.timeout_secs(), 5);
+        assert_eq!(cfg.proxy_url(), Some("http://127.0.0.1:7890"));
+    }
+}
