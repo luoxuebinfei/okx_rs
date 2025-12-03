@@ -24,13 +24,19 @@ pub mod endpoints {
     pub const SAVING_LENDING_HISTORY: &str = "/api/v5/finance/savings/lending-history";
     pub const SAVING_PUBLIC_LENDING_RATE: &str = "/api/v5/finance/savings/lending-rate-summary";
 
-    // Simple Earn Fixed Loan
-    pub const SIMPLE_EARN_OFFERS: &str = "/api/v5/finance/fixed-loan/borrowable-amount";
-    pub const SIMPLE_EARN_APR_HISTORY: &str = "/api/v5/finance/fixed-loan/interest-rate-history";
-    pub const SIMPLE_EARN_OPEN_ORDERS: &str = "/api/v5/finance/fixed-loan/active-orders";
-    pub const SIMPLE_EARN_HISTORY_ORDERS: &str = "/api/v5/finance/fixed-loan/history-orders";
-    pub const SIMPLE_EARN_PLACE_ORDER: &str = "/api/v5/finance/fixed-loan/borrow";
-    pub const SIMPLE_EARN_REPAY_ORDER: &str = "/api/v5/finance/fixed-loan/repay";
+    // Simple Earn Fixed Loan (official SimpleEarnFixedAPI)
+    pub const SIMPLE_EARN_LENDING_OFFERS: &str = "/api/v5/finance/fixed-loan/lending-offers";
+    pub const SIMPLE_EARN_LENDING_APY_HISTORY: &str =
+        "/api/v5/finance/fixed-loan/lending-apy-history";
+    pub const SIMPLE_EARN_PENDING_LENDING_VOLUME: &str =
+        "/api/v5/finance/fixed-loan/pending-lending-volume";
+    pub const SIMPLE_EARN_LENDING_ORDER: &str = "/api/v5/finance/fixed-loan/lending-order";
+    pub const SIMPLE_EARN_AMEND_LENDING_ORDER: &str =
+        "/api/v5/finance/fixed-loan/amend-lending-order";
+    pub const SIMPLE_EARN_LENDING_ORDERS_LIST: &str =
+        "/api/v5/finance/fixed-loan/lending-orders-list";
+    pub const SIMPLE_EARN_LENDING_SUB_ORDERS: &str =
+        "/api/v5/finance/fixed-loan/lending-sub-orders";
 }
 
 /// 财务产品 API。
@@ -84,29 +90,33 @@ pub trait FinanceApi {
     ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
 
     // Simple Earn Fixed Loan
-    fn simple_earn_get_offers(
+    fn simple_earn_get_lending_offers(
         &self,
         params: Option<Value>,
     ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
-    fn simple_earn_apr_history(
+    fn simple_earn_get_lending_apy_history(
         &self,
         params: Option<Value>,
     ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
-    fn simple_earn_open_orders(
+    fn simple_earn_get_pending_lending_volume(
         &self,
         params: Option<Value>,
     ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
-    fn simple_earn_history_orders(
-        &self,
-        params: Option<Value>,
-    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
-    fn simple_earn_place_order(
+    fn simple_earn_place_lending_order(
         &self,
         request: Value,
     ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
-    fn simple_earn_repay_order(
+    fn simple_earn_amend_lending_order(
         &self,
         request: Value,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+    fn simple_earn_get_lending_orders_list(
+        &self,
+        params: Option<Value>,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+    fn simple_earn_get_lending_sub_orders(
+        &self,
+        params: Option<Value>,
     ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
 }
 
@@ -155,28 +165,47 @@ impl FinanceApi for OkxRestClient {
     }
 
     // Simple Earn Fixed Loan
-    async fn simple_earn_get_offers(&self, params: Option<Value>) -> Result<Vec<Value>> {
-        self.get(endpoints::SIMPLE_EARN_OFFERS, params.as_ref())
+    async fn simple_earn_get_lending_offers(&self, params: Option<Value>) -> Result<Vec<Value>> {
+        self.get(endpoints::SIMPLE_EARN_LENDING_OFFERS, params.as_ref())
             .await
     }
-    async fn simple_earn_apr_history(&self, params: Option<Value>) -> Result<Vec<Value>> {
-        self.get(endpoints::SIMPLE_EARN_APR_HISTORY, params.as_ref())
+    async fn simple_earn_get_lending_apy_history(
+        &self,
+        params: Option<Value>,
+    ) -> Result<Vec<Value>> {
+        self.get(endpoints::SIMPLE_EARN_LENDING_APY_HISTORY, params.as_ref())
             .await
     }
-    async fn simple_earn_open_orders(&self, params: Option<Value>) -> Result<Vec<Value>> {
-        self.get(endpoints::SIMPLE_EARN_OPEN_ORDERS, params.as_ref())
+    async fn simple_earn_get_pending_lending_volume(
+        &self,
+        params: Option<Value>,
+    ) -> Result<Vec<Value>> {
+        self.get(
+            endpoints::SIMPLE_EARN_PENDING_LENDING_VOLUME,
+            params.as_ref(),
+        )
+        .await
+    }
+    async fn simple_earn_place_lending_order(&self, request: Value) -> Result<Vec<Value>> {
+        self.post(endpoints::SIMPLE_EARN_LENDING_ORDER, &request)
             .await
     }
-    async fn simple_earn_history_orders(&self, params: Option<Value>) -> Result<Vec<Value>> {
-        self.get(endpoints::SIMPLE_EARN_HISTORY_ORDERS, params.as_ref())
+    async fn simple_earn_amend_lending_order(&self, request: Value) -> Result<Vec<Value>> {
+        self.post(endpoints::SIMPLE_EARN_AMEND_LENDING_ORDER, &request)
             .await
     }
-    async fn simple_earn_place_order(&self, request: Value) -> Result<Vec<Value>> {
-        self.post(endpoints::SIMPLE_EARN_PLACE_ORDER, &request)
+    async fn simple_earn_get_lending_orders_list(
+        &self,
+        params: Option<Value>,
+    ) -> Result<Vec<Value>> {
+        self.get(endpoints::SIMPLE_EARN_LENDING_ORDERS_LIST, params.as_ref())
             .await
     }
-    async fn simple_earn_repay_order(&self, request: Value) -> Result<Vec<Value>> {
-        self.post(endpoints::SIMPLE_EARN_REPAY_ORDER, &request)
+    async fn simple_earn_get_lending_sub_orders(
+        &self,
+        params: Option<Value>,
+    ) -> Result<Vec<Value>> {
+        self.get(endpoints::SIMPLE_EARN_LENDING_SUB_ORDERS, params.as_ref())
             .await
     }
 }

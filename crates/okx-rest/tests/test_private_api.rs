@@ -10,9 +10,12 @@ use okx_core::{
     Config, Credentials,
 };
 use okx_rest::api::account::{
-    self, AdjustmentMarginRequest, GetFeeRatesParams, GetLeverageInfoParams, GetMaxAvailSizeParams,
-    GetMaxSizeParams, GetPositionsParams, SetAutoLoanRequest, SetLeverageRequest,
-    SetRiskOffsetTypeRequest,
+    self, AdjustmentMarginRequest, AmendFixLoanBorrowingOrderRequest, FixLoanBorrowingOrderRequest,
+    FixLoanManualReborrowRequest, GetFeeRatesParams, GetFixLoanBorrowingOrdersListParams,
+    GetFixLoanBorrowingQuoteParams, GetInterestLimitsParams, GetLeverageInfoParams,
+    GetMaxAvailSizeParams, GetMaxSizeParams, GetPositionsParams, GetVipLoanOrderDetailParams,
+    GetVipLoanOrderListParams, RepayFixLoanBorrowingOrderRequest, SetAutoLoanRequest,
+    SetAutoRepayRequest, SetLeverageRequest, SetRiskOffsetTypeRequest,
 };
 use okx_rest::api::block_rfq;
 use okx_rest::api::broker;
@@ -135,6 +138,247 @@ async fn account_margin_and_risk_settings_paths() {
     assert_eq!(body["autoLoan"], "true");
     let msg = expect_http_error(client.set_auto_loan(auto).await.unwrap_err());
     assert!(msg.contains(account::endpoints::SET_AUTO_LOAN));
+}
+
+#[tokio::test]
+async fn account_new_endpoints_paths() {
+    let client = dummy_client();
+
+    let msg = expect_http_error(client.activate_option().await.unwrap_err());
+    assert!(msg.contains(account::endpoints::ACTIVATE_OPTION));
+
+    let auto_repay = SetAutoRepayRequest {
+        auto_repay: Some(true),
+    };
+    let body = to_value(&auto_repay).expect("序列化 set_auto_repay 请求失败");
+    assert_eq!(body["autoRepay"], true);
+    let msg = expect_http_error(client.set_auto_repay(auto_repay).await.unwrap_err());
+    assert!(msg.contains(account::endpoints::SET_AUTO_REPAY));
+
+    let interest_limits = GetInterestLimitsParams {
+        r#type: Some("1".into()),
+        ccy: Some("USDT".into()),
+    };
+    let body = to_value(&interest_limits).expect("序列化 interest_limits 请求失败");
+    assert_eq!(body["type"], "1");
+    let msg = expect_http_error(
+        client
+            .get_interest_limits(Some(interest_limits))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(account::endpoints::INTEREST_LIMITS));
+
+    let vip_list = GetVipLoanOrderListParams {
+        ord_id: Some("1".into()),
+        state: Some("filled".into()),
+        ccy: Some("USDT".into()),
+        after: Some("10".into()),
+        before: Some("1".into()),
+        limit: Some("20".into()),
+    };
+    let body = to_value(&vip_list).expect("序列化 vip loan list 失败");
+    assert_eq!(body["ordId"], "1");
+    let msg = expect_http_error(
+        client
+            .get_vip_loan_order_list(Some(vip_list))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(account::endpoints::VIP_LOAN_ORDER_LIST));
+
+    let vip_detail = GetVipLoanOrderDetailParams {
+        ccy: Some("USDT".into()),
+        ord_id: Some("2".into()),
+        after: None,
+        before: None,
+        limit: None,
+    };
+    let body = to_value(&vip_detail).expect("序列化 vip loan detail 失败");
+    assert_eq!(body["ordId"], "2");
+    let msg = expect_http_error(
+        client
+            .get_vip_loan_order_detail(Some(vip_detail))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(account::endpoints::VIP_LOAN_ORDER_DETAIL));
+
+    let msg = expect_http_error(client.get_fix_loan_borrowing_limit().await.unwrap_err());
+    assert!(msg.contains(account::endpoints::FIX_LOAN_BORROWING_LIMIT));
+
+    let quote_params = GetFixLoanBorrowingQuoteParams {
+        r#type: Some("1".into()),
+        ccy: Some("USDT".into()),
+        amt: Some("10".into()),
+        max_rate: Some("0.02".into()),
+        term: Some("7".into()),
+        ord_id: Some("123".into()),
+    };
+    let body = to_value(&quote_params).expect("序列化 fix loan quote 失败");
+    assert_eq!(body["maxRate"], "0.02");
+    let msg = expect_http_error(
+        client
+            .get_fix_loan_borrowing_quote(Some(quote_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(account::endpoints::FIX_LOAN_BORROWING_QUOTE));
+
+    let order_req = FixLoanBorrowingOrderRequest {
+        ccy: Some("USDT".into()),
+        amt: Some("10".into()),
+        max_rate: Some("0.02".into()),
+        term: Some("7".into()),
+        reborrow: Some(true),
+        reborrow_rate: Some("0.03".into()),
+    };
+    let body = to_value(&order_req).expect("序列化 fix loan order 失败");
+    assert_eq!(body["reborrow"], true);
+    let msg = expect_http_error(
+        client
+            .place_fix_loan_borrowing_order(order_req)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(account::endpoints::FIX_LOAN_BORROWING_ORDER));
+
+    let amend_req = AmendFixLoanBorrowingOrderRequest {
+        ord_id: Some("123".into()),
+        reborrow: Some(false),
+        renew_max_rate: Some("0.01".into()),
+    };
+    let body = to_value(&amend_req).expect("序列化 amend fix loan 失败");
+    assert_eq!(body["renewMaxRate"], "0.01");
+    let msg = expect_http_error(
+        client
+            .amend_fix_loan_borrowing_order(amend_req)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(account::endpoints::FIX_LOAN_AMEND_BORROWING_ORDER));
+
+    let manual_req = FixLoanManualReborrowRequest {
+        ord_id: Some("123".into()),
+        max_rate: Some("0.02".into()),
+    };
+    let msg = expect_http_error(
+        client
+            .fix_loan_manual_reborrow(manual_req)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(account::endpoints::FIX_LOAN_MANUAL_REBORROW));
+
+    let repay_req = RepayFixLoanBorrowingOrderRequest {
+        ord_id: Some("123".into()),
+    };
+    let msg = expect_http_error(
+        client
+            .repay_fix_loan_borrowing_order(repay_req)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(account::endpoints::FIX_LOAN_REPAY_BORROWING_ORDER));
+
+    let list_params = GetFixLoanBorrowingOrdersListParams {
+        ord_id: Some("123".into()),
+        ccy: Some("USDT".into()),
+        state: Some("filled".into()),
+        after: Some("1".into()),
+        before: Some("0".into()),
+        limit: Some("10".into()),
+    };
+    let body = to_value(&list_params).expect("序列化 fix loan list 失败");
+    assert_eq!(body["state"], "filled");
+    let msg = expect_http_error(
+        client
+            .get_fix_loan_borrowing_orders_list(Some(list_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(account::endpoints::FIX_LOAN_BORROWING_ORDERS_LIST));
+}
+
+#[tokio::test]
+async fn finance_simple_earn_endpoints_paths() {
+    let client = dummy_client();
+
+    let offers_params = json!({"ccy": "USDT"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_get_lending_offers(Some(offers_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_LENDING_OFFERS));
+
+    let apy_params = json!({"ccy": "USDT", "term": "7"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_get_lending_apy_history(Some(apy_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_LENDING_APY_HISTORY));
+
+    let pending_params = json!({"ccy": "USDT"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_get_pending_lending_volume(Some(pending_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_PENDING_LENDING_VOLUME));
+
+    let place_body = json!({
+        "ccy": "USDT",
+        "amt": "10",
+        "rate": "0.02",
+        "term": "7",
+        "autoRenewal": true
+    });
+    assert_eq!(place_body["rate"], "0.02");
+    let msg = expect_http_error(
+        client
+            .simple_earn_place_lending_order(place_body)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_LENDING_ORDER));
+
+    let amend_body = json!({
+        "ordId": "123",
+        "changeAmt": "5",
+        "rate": "0.01",
+        "autoRenewal": false
+    });
+    assert_eq!(amend_body["changeAmt"], "5");
+    let msg = expect_http_error(
+        client
+            .simple_earn_amend_lending_order(amend_body)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_AMEND_LENDING_ORDER));
+
+    let list_params = json!({"ccy": "USDT", "state": "ongoing"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_get_lending_orders_list(Some(list_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_LENDING_ORDERS_LIST));
+
+    let sub_params = json!({"ordId": "123"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_get_lending_sub_orders(Some(sub_params))
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_LENDING_SUB_ORDERS));
 }
 
 #[tokio::test]
@@ -1080,56 +1324,65 @@ async fn finance_paths_cover_basic_calls() {
     let earn_offers = json!({"ccy": "USDT"});
     let msg = expect_http_error(
         client
-            .simple_earn_get_offers(Some(earn_offers))
+            .simple_earn_get_lending_offers(Some(earn_offers))
             .await
             .unwrap_err(),
     );
-    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_OFFERS));
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_LENDING_OFFERS));
 
     let apr_params = json!({"ccy": "USDT"});
     let msg = expect_http_error(
         client
-            .simple_earn_apr_history(Some(apr_params))
+            .simple_earn_get_lending_apy_history(Some(apr_params))
             .await
             .unwrap_err(),
     );
-    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_APR_HISTORY));
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_LENDING_APY_HISTORY));
 
-    let open_params = json!({"ccy": "USDT"});
+    let pending_params = json!({"ccy": "USDT"});
     let msg = expect_http_error(
         client
-            .simple_earn_open_orders(Some(open_params))
+            .simple_earn_get_pending_lending_volume(Some(pending_params))
             .await
             .unwrap_err(),
     );
-    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_OPEN_ORDERS));
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_PENDING_LENDING_VOLUME));
 
-    let history_orders = json!({"ccy": "USDT"});
+    let list_params = json!({"ccy": "USDT"});
     let msg = expect_http_error(
         client
-            .simple_earn_history_orders(Some(history_orders))
+            .simple_earn_get_lending_orders_list(Some(list_params))
             .await
             .unwrap_err(),
     );
-    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_HISTORY_ORDERS));
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_LENDING_ORDERS_LIST));
 
-    let simple_earn_body = json!({"ccy": "USDT", "amt": "10", "term": "7"});
+    let sub_orders_params = json!({"ordId": "123"});
     let msg = expect_http_error(
         client
-            .simple_earn_place_order(simple_earn_body)
+            .simple_earn_get_lending_sub_orders(Some(sub_orders_params))
             .await
             .unwrap_err(),
     );
-    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_PLACE_ORDER));
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_LENDING_SUB_ORDERS));
 
-    let repay_body = json!({"ordId": "123"});
+    let simple_earn_body = json!({"ccy": "USDT", "amt": "10", "rate": "0.02", "term": "7"});
     let msg = expect_http_error(
         client
-            .simple_earn_repay_order(repay_body)
+            .simple_earn_place_lending_order(simple_earn_body)
             .await
             .unwrap_err(),
     );
-    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_REPAY_ORDER));
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_LENDING_ORDER));
+
+    let amend_body = json!({"ordId": "123", "changeAmt": "5"});
+    let msg = expect_http_error(
+        client
+            .simple_earn_amend_lending_order(amend_body)
+            .await
+            .unwrap_err(),
+    );
+    assert!(msg.contains(finance::endpoints::SIMPLE_EARN_AMEND_LENDING_ORDER));
 }
 
 #[tokio::test]

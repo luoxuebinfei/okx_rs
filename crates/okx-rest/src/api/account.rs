@@ -81,6 +81,33 @@ pub mod endpoints {
     pub const ACCOUNT_POSITION_TIERS: &str = "/api/v5/account/position-tiers";
     /// Greeks
     pub const GREEKS: &str = "/api/v5/account/greeks";
+    /// Activate option trading
+    pub const ACTIVATE_OPTION: &str = "/api/v5/account/activate-option";
+    /// Set auto repay
+    pub const SET_AUTO_REPAY: &str = "/api/v5/account/set-auto-repay";
+    /// Interest limits
+    pub const INTEREST_LIMITS: &str = "/api/v5/account/interest-limits";
+    /// VIP loan order list
+    pub const VIP_LOAN_ORDER_LIST: &str = "/api/v5/account/vip-loan-order-list";
+    /// VIP loan order detail
+    pub const VIP_LOAN_ORDER_DETAIL: &str = "/api/v5/account/vip-loan-order-detail";
+    /// Fixed loan borrowing limit
+    pub const FIX_LOAN_BORROWING_LIMIT: &str = "/api/v5/account/fixed-loan/borrowing-limit";
+    /// Fixed loan borrowing quote
+    pub const FIX_LOAN_BORROWING_QUOTE: &str = "/api/v5/account/fixed-loan/borrowing-quote";
+    /// Fixed loan borrowing order
+    pub const FIX_LOAN_BORROWING_ORDER: &str = "/api/v5/account/fixed-loan/borrowing-order";
+    /// Fixed loan amend borrowing order
+    pub const FIX_LOAN_AMEND_BORROWING_ORDER: &str =
+        "/api/v5/account/fixed-loan/amend-borrowing-order";
+    /// Fixed loan manual reborrow
+    pub const FIX_LOAN_MANUAL_REBORROW: &str = "/api/v5/account/fixed-loan/manual-reborrow";
+    /// Fixed loan repay borrowing order
+    pub const FIX_LOAN_REPAY_BORROWING_ORDER: &str =
+        "/api/v5/account/fixed-loan/repay-borrowing-order";
+    /// Fixed loan borrowing orders list
+    pub const FIX_LOAN_BORROWING_ORDERS_LIST: &str =
+        "/api/v5/account/fixed-loan/borrowing-orders-list";
 }
 
 /// Query parameters for get_balance.
@@ -688,6 +715,180 @@ pub struct SetAutoLoanRequest {
     pub auto_loan: Option<String>,
 }
 
+/// 设置自动还币请求。
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SetAutoRepayRequest {
+    /// 是否开启自动还币
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_repay: Option<bool>,
+}
+
+/// 借币利息抵扣额度查询参数。
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GetInterestLimitsParams {
+    /// 类型
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+    /// 币种
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ccy: Option<String>,
+}
+
+/// 尊享借币订单列表查询参数。
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GetVipLoanOrderListParams {
+    /// 订单 ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ord_id: Option<String>,
+    /// 订单状态
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state: Option<String>,
+    /// 币种
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ccy: Option<String>,
+    /// 分页游标
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+    /// 分页游标
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+    /// 分页数量
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<String>,
+}
+
+/// 尊享借币订单详情查询参数。
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GetVipLoanOrderDetailParams {
+    /// 币种
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ccy: Option<String>,
+    /// 订单 ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ord_id: Option<String>,
+    /// 分页游标
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+    /// 分页游标
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+    /// 分页数量
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<String>,
+}
+
+/// 定期借币报价查询参数。
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GetFixLoanBorrowingQuoteParams {
+    /// 类型
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+    /// 币种
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ccy: Option<String>,
+    /// 借币数量
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amt: Option<String>,
+    /// 最高利率
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_rate: Option<String>,
+    /// 借币期限
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub term: Option<String>,
+    /// 订单 ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ord_id: Option<String>,
+}
+
+/// 定期借币下单请求。
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FixLoanBorrowingOrderRequest {
+    /// 币种
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ccy: Option<String>,
+    /// 借币数量
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub amt: Option<String>,
+    /// 最高利率
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_rate: Option<String>,
+    /// 借币期限
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub term: Option<String>,
+    /// 是否自动续借
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reborrow: Option<bool>,
+    /// 自动续借最高利率
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reborrow_rate: Option<String>,
+}
+
+/// 修改定期借币订单请求。
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AmendFixLoanBorrowingOrderRequest {
+    /// 订单 ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ord_id: Option<String>,
+    /// 是否自动续借
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reborrow: Option<bool>,
+    /// 续借最高利率
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub renew_max_rate: Option<String>,
+}
+
+/// 手动续借请求。
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FixLoanManualReborrowRequest {
+    /// 订单 ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ord_id: Option<String>,
+    /// 最高利率
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_rate: Option<String>,
+}
+
+/// 定期借币还币请求。
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RepayFixLoanBorrowingOrderRequest {
+    /// 订单 ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ord_id: Option<String>,
+}
+
+/// 定期借币订单列表查询参数。
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GetFixLoanBorrowingOrdersListParams {
+    /// 订单 ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ord_id: Option<String>,
+    /// 币种
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ccy: Option<String>,
+    /// 状态
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state: Option<String>,
+    /// 分页游标
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+    /// 分页游标
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+    /// 分页数量
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<String>,
+}
+
 /// Raw account payload used for untyped endpoints.
 pub type AccountRaw = Value;
 
@@ -936,6 +1137,74 @@ pub trait AccountApi {
         request: SetAutoLoanRequest,
     ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
 
+    /// 激活期权交易。
+    fn activate_option(&self) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 设置自动还币。
+    fn set_auto_repay(
+        &self,
+        request: SetAutoRepayRequest,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 借币利息抵扣额度及利率。
+    fn get_interest_limits(
+        &self,
+        params: Option<GetInterestLimitsParams>,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 尊享借币订单列表。
+    fn get_vip_loan_order_list(
+        &self,
+        params: Option<GetVipLoanOrderListParams>,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 尊享借币订单详情。
+    fn get_vip_loan_order_detail(
+        &self,
+        params: Option<GetVipLoanOrderDetailParams>,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 定期借币限额。
+    fn get_fix_loan_borrowing_limit(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 定期借币报价。
+    fn get_fix_loan_borrowing_quote(
+        &self,
+        params: Option<GetFixLoanBorrowingQuoteParams>,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 定期借币下单。
+    fn place_fix_loan_borrowing_order(
+        &self,
+        request: FixLoanBorrowingOrderRequest,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 修改定期借币订单。
+    fn amend_fix_loan_borrowing_order(
+        &self,
+        request: AmendFixLoanBorrowingOrderRequest,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 定期借币手动续借。
+    fn fix_loan_manual_reborrow(
+        &self,
+        request: FixLoanManualReborrowRequest,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 定期借币还币。
+    fn repay_fix_loan_borrowing_order(
+        &self,
+        request: RepayFixLoanBorrowingOrderRequest,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
+    /// 定期借币订单列表。
+    fn get_fix_loan_borrowing_orders_list(
+        &self,
+        params: Option<GetFixLoanBorrowingOrdersListParams>,
+    ) -> impl std::future::Future<Output = Result<Vec<AccountRaw>>> + Send;
+
     /// Interest accrued records.
     fn get_interest_accrued(
         &self,
@@ -1121,6 +1390,91 @@ impl AccountApi for OkxRestClient {
 
     async fn set_auto_loan(&self, request: SetAutoLoanRequest) -> Result<Vec<AccountRaw>> {
         self.post(endpoints::SET_AUTO_LOAN, &request).await
+    }
+
+    async fn activate_option(&self) -> Result<Vec<AccountRaw>> {
+        self.post(endpoints::ACTIVATE_OPTION, &serde_json::json!({}))
+            .await
+    }
+
+    async fn set_auto_repay(&self, request: SetAutoRepayRequest) -> Result<Vec<AccountRaw>> {
+        self.post(endpoints::SET_AUTO_REPAY, &request).await
+    }
+
+    async fn get_interest_limits(
+        &self,
+        params: Option<GetInterestLimitsParams>,
+    ) -> Result<Vec<AccountRaw>> {
+        self.get(endpoints::INTEREST_LIMITS, params.as_ref()).await
+    }
+
+    async fn get_vip_loan_order_list(
+        &self,
+        params: Option<GetVipLoanOrderListParams>,
+    ) -> Result<Vec<AccountRaw>> {
+        self.get(endpoints::VIP_LOAN_ORDER_LIST, params.as_ref())
+            .await
+    }
+
+    async fn get_vip_loan_order_detail(
+        &self,
+        params: Option<GetVipLoanOrderDetailParams>,
+    ) -> Result<Vec<AccountRaw>> {
+        self.get(endpoints::VIP_LOAN_ORDER_DETAIL, params.as_ref())
+            .await
+    }
+
+    async fn get_fix_loan_borrowing_limit(&self) -> Result<Vec<AccountRaw>> {
+        self.get(endpoints::FIX_LOAN_BORROWING_LIMIT, None::<&()>)
+            .await
+    }
+
+    async fn get_fix_loan_borrowing_quote(
+        &self,
+        params: Option<GetFixLoanBorrowingQuoteParams>,
+    ) -> Result<Vec<AccountRaw>> {
+        self.get(endpoints::FIX_LOAN_BORROWING_QUOTE, params.as_ref())
+            .await
+    }
+
+    async fn place_fix_loan_borrowing_order(
+        &self,
+        request: FixLoanBorrowingOrderRequest,
+    ) -> Result<Vec<AccountRaw>> {
+        self.post(endpoints::FIX_LOAN_BORROWING_ORDER, &request)
+            .await
+    }
+
+    async fn amend_fix_loan_borrowing_order(
+        &self,
+        request: AmendFixLoanBorrowingOrderRequest,
+    ) -> Result<Vec<AccountRaw>> {
+        self.post(endpoints::FIX_LOAN_AMEND_BORROWING_ORDER, &request)
+            .await
+    }
+
+    async fn fix_loan_manual_reborrow(
+        &self,
+        request: FixLoanManualReborrowRequest,
+    ) -> Result<Vec<AccountRaw>> {
+        self.post(endpoints::FIX_LOAN_MANUAL_REBORROW, &request)
+            .await
+    }
+
+    async fn repay_fix_loan_borrowing_order(
+        &self,
+        request: RepayFixLoanBorrowingOrderRequest,
+    ) -> Result<Vec<AccountRaw>> {
+        self.post(endpoints::FIX_LOAN_REPAY_BORROWING_ORDER, &request)
+            .await
+    }
+
+    async fn get_fix_loan_borrowing_orders_list(
+        &self,
+        params: Option<GetFixLoanBorrowingOrdersListParams>,
+    ) -> Result<Vec<AccountRaw>> {
+        self.get(endpoints::FIX_LOAN_BORROWING_ORDERS_LIST, params.as_ref())
+            .await
     }
 
     async fn get_interest_accrued(

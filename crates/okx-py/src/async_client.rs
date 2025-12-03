@@ -13,14 +13,17 @@ use okx_core::types::{
     OneClickRepayRequest,
 };
 use okx_rest::api::account::{
-    AdjustmentMarginRequest, BorrowRepayHistoryParams, BorrowRepayRequest,
+    AdjustmentMarginRequest, AmendFixLoanBorrowingOrderRequest, BorrowRepayHistoryParams,
+    BorrowRepayRequest, FixLoanBorrowingOrderRequest, FixLoanManualReborrowRequest,
     GetAccountPositionTiersParams, GetBillsArchiveParams, GetBillsParams, GetFeeRatesParams,
-    GetGreeksParams, GetInterestAccruedParams, GetLeverageInfoParams, GetMaxAvailSizeParams,
-    GetMaxLoanParams, GetMaxSizeParams, GetMaxWithdrawalParams, GetPositionsHistoryParams,
-    GetPositionsParams, GetSimulatedMarginParams, GetVipInterestParams, PositionBuilderRequest,
-    SetAccountLevelRequest, SetAutoLoanRequest, SetGreeksRequest, SetIsolatedModeRequest,
-    SetLeverageRequest, SetRiskOffsetTypeRequest, SpotBorrowRepayHistoryParams,
-    SpotManualBorrowRepayRequest,
+    GetFixLoanBorrowingOrdersListParams, GetFixLoanBorrowingQuoteParams, GetGreeksParams,
+    GetInterestAccruedParams, GetInterestLimitsParams, GetLeverageInfoParams,
+    GetMaxAvailSizeParams, GetMaxLoanParams, GetMaxSizeParams, GetMaxWithdrawalParams,
+    GetPositionsHistoryParams, GetPositionsParams, GetSimulatedMarginParams, GetVipInterestParams,
+    GetVipLoanOrderDetailParams, GetVipLoanOrderListParams, PositionBuilderRequest,
+    RepayFixLoanBorrowingOrderRequest, SetAccountLevelRequest, SetAutoLoanRequest,
+    SetAutoRepayRequest, SetGreeksRequest, SetIsolatedModeRequest, SetLeverageRequest,
+    SetRiskOffsetTypeRequest, SpotBorrowRepayHistoryParams, SpotManualBorrowRepayRequest,
 };
 use okx_rest::api::funding::{
     CancelWithdrawalParams, ConvertDustAssetsRequest, GetAssetValuationParams,
@@ -643,6 +646,331 @@ impl PyAsyncOkxClient {
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             client
                 .set_auto_loan(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 激活期权交易（异步）。
+    fn activate_option<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .activate_option()
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 设置自动还币（异步）。
+    #[pyo3(signature = (auto_repay=None))]
+    fn set_auto_repay<'py>(
+        &self,
+        py: Python<'py>,
+        auto_repay: Option<bool>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = SetAutoRepayRequest { auto_repay };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .set_auto_repay(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 借币利息抵扣额度及利率（异步）。
+    #[pyo3(signature = (type_=None, ccy=None))]
+    fn get_interest_limits<'py>(
+        &self,
+        py: Python<'py>,
+        type_: Option<String>,
+        ccy: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = if type_.is_some() || ccy.is_some() {
+            Some(GetInterestLimitsParams { r#type: type_, ccy })
+        } else {
+            None
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_interest_limits(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 尊享借币订单列表（异步）。
+    #[pyo3(signature = (ord_id=None, state=None, ccy=None, after=None, before=None, limit=None))]
+    fn get_vip_loan_order_list<'py>(
+        &self,
+        py: Python<'py>,
+        ord_id: Option<String>,
+        state: Option<String>,
+        ccy: Option<String>,
+        after: Option<String>,
+        before: Option<String>,
+        limit: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = if ord_id.is_some()
+            || state.is_some()
+            || ccy.is_some()
+            || after.is_some()
+            || before.is_some()
+            || limit.is_some()
+        {
+            Some(GetVipLoanOrderListParams {
+                ord_id,
+                state,
+                ccy,
+                after,
+                before,
+                limit,
+            })
+        } else {
+            None
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_vip_loan_order_list(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 尊享借币订单详情（异步）。
+    #[pyo3(signature = (ccy=None, ord_id=None, after=None, before=None, limit=None))]
+    fn get_vip_loan_order_detail<'py>(
+        &self,
+        py: Python<'py>,
+        ccy: Option<String>,
+        ord_id: Option<String>,
+        after: Option<String>,
+        before: Option<String>,
+        limit: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = if ccy.is_some()
+            || ord_id.is_some()
+            || after.is_some()
+            || before.is_some()
+            || limit.is_some()
+        {
+            Some(GetVipLoanOrderDetailParams {
+                ccy,
+                ord_id,
+                after,
+                before,
+                limit,
+            })
+        } else {
+            None
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_vip_loan_order_detail(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币限额（异步）。
+    fn get_fix_loan_borrowing_limit<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_fix_loan_borrowing_limit()
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币报价（异步）。
+    #[pyo3(signature = (type_=None, ccy=None, amt=None, max_rate=None, term=None, ord_id=None))]
+    fn get_fix_loan_borrowing_quote<'py>(
+        &self,
+        py: Python<'py>,
+        type_: Option<String>,
+        ccy: Option<String>,
+        amt: Option<String>,
+        max_rate: Option<String>,
+        term: Option<String>,
+        ord_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = if type_.is_some()
+            || ccy.is_some()
+            || amt.is_some()
+            || max_rate.is_some()
+            || term.is_some()
+            || ord_id.is_some()
+        {
+            Some(GetFixLoanBorrowingQuoteParams {
+                r#type: type_,
+                ccy,
+                amt,
+                max_rate,
+                term,
+                ord_id,
+            })
+        } else {
+            None
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_fix_loan_borrowing_quote(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币下单（异步）。
+    #[pyo3(signature = (ccy=None, amt=None, max_rate=None, term=None, reborrow=None, reborrow_rate=None))]
+    fn place_fix_loan_borrowing_order<'py>(
+        &self,
+        py: Python<'py>,
+        ccy: Option<String>,
+        amt: Option<String>,
+        max_rate: Option<String>,
+        term: Option<String>,
+        reborrow: Option<bool>,
+        reborrow_rate: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = FixLoanBorrowingOrderRequest {
+            ccy,
+            amt,
+            max_rate,
+            term,
+            reborrow,
+            reborrow_rate,
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .place_fix_loan_borrowing_order(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 修改定期借币订单（异步）。
+    #[pyo3(signature = (ord_id=None, reborrow=None, renew_max_rate=None))]
+    fn amend_fix_loan_borrowing_order<'py>(
+        &self,
+        py: Python<'py>,
+        ord_id: Option<String>,
+        reborrow: Option<bool>,
+        renew_max_rate: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = AmendFixLoanBorrowingOrderRequest {
+            ord_id,
+            reborrow,
+            renew_max_rate,
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .amend_fix_loan_borrowing_order(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币手动续借（异步）。
+    #[pyo3(signature = (ord_id=None, max_rate=None))]
+    fn fix_loan_manual_reborrow<'py>(
+        &self,
+        py: Python<'py>,
+        ord_id: Option<String>,
+        max_rate: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = FixLoanManualReborrowRequest { ord_id, max_rate };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .fix_loan_manual_reborrow(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币还币（异步）。
+    #[pyo3(signature = (ord_id=None))]
+    fn repay_fix_loan_borrowing_order<'py>(
+        &self,
+        py: Python<'py>,
+        ord_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let request = RepayFixLoanBorrowingOrderRequest { ord_id };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .repay_fix_loan_borrowing_order(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币订单列表（异步）。
+    #[pyo3(signature = (ord_id=None, ccy=None, state=None, after=None, before=None, limit=None))]
+    fn get_fix_loan_borrowing_orders_list<'py>(
+        &self,
+        py: Python<'py>,
+        ord_id: Option<String>,
+        ccy: Option<String>,
+        state: Option<String>,
+        after: Option<String>,
+        before: Option<String>,
+        limit: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = if ord_id.is_some()
+            || ccy.is_some()
+            || state.is_some()
+            || after.is_some()
+            || before.is_some()
+            || limit.is_some()
+        {
+            Some(GetFixLoanBorrowingOrdersListParams {
+                ord_id,
+                ccy,
+                state,
+                after,
+                before,
+                limit,
+            })
+        } else {
+            None
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .get_fix_loan_borrowing_orders_list(params)
                 .await
                 .map_err(to_py_err)
                 .and_then(values_to_py_list)
@@ -3016,7 +3344,7 @@ impl PyAsyncOkxClient {
     }
 
     #[pyo3(signature = (params_json=None))]
-    fn simple_earn_get_offers<'py>(
+    fn simple_earn_get_lending_offers<'py>(
         &self,
         py: Python<'py>,
         params_json: Option<String>,
@@ -3024,7 +3352,87 @@ impl PyAsyncOkxClient {
         let client = Arc::clone(&self.client);
         let params = parse_json_value(params_json.as_deref(), "params")?;
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            map_values(client.simple_earn_get_offers(params).await)
+            map_values(client.simple_earn_get_lending_offers(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn simple_earn_get_lending_apy_history<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.simple_earn_get_lending_apy_history(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn simple_earn_get_pending_lending_volume<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.simple_earn_get_pending_lending_volume(params).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn simple_earn_place_lending_order<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.simple_earn_place_lending_order(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn simple_earn_amend_lending_order<'py>(
+        &self,
+        py: Python<'py>,
+        payload_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let payload = parse_json_value(Some(&payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.simple_earn_amend_lending_order(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn simple_earn_get_lending_orders_list<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.simple_earn_get_lending_orders_list(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn simple_earn_get_lending_sub_orders<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let params = parse_json_value(params_json.as_deref(), "params")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(client.simple_earn_get_lending_sub_orders(params).await)
         })
     }
 

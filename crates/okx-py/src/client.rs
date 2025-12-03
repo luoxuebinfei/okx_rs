@@ -13,12 +13,16 @@ use okx_core::types::{
     OneClickRepayRequest,
 };
 use okx_rest::api::account::{
-    AdjustmentMarginRequest, BorrowRepayHistoryParams, BorrowRepayRequest,
+    AdjustmentMarginRequest, AmendFixLoanBorrowingOrderRequest, BorrowRepayHistoryParams,
+    BorrowRepayRequest, FixLoanBorrowingOrderRequest, FixLoanManualReborrowRequest,
     GetAccountPositionTiersParams, GetBillsArchiveParams, GetBillsParams, GetFeeRatesParams,
-    GetGreeksParams, GetInterestAccruedParams, GetLeverageInfoParams, GetMaxAvailSizeParams,
-    GetMaxLoanParams, GetMaxSizeParams, GetMaxWithdrawalParams, GetPositionsHistoryParams,
-    GetSimulatedMarginParams, GetVipInterestParams, PositionBuilderRequest, SetAccountLevelRequest,
-    SetAutoLoanRequest, SetGreeksRequest, SetIsolatedModeRequest, SetLeverageRequest,
+    GetFixLoanBorrowingOrdersListParams, GetFixLoanBorrowingQuoteParams, GetGreeksParams,
+    GetInterestAccruedParams, GetInterestLimitsParams, GetLeverageInfoParams,
+    GetMaxAvailSizeParams, GetMaxLoanParams, GetMaxSizeParams, GetMaxWithdrawalParams,
+    GetPositionsHistoryParams, GetSimulatedMarginParams, GetVipInterestParams,
+    GetVipLoanOrderDetailParams, GetVipLoanOrderListParams, PositionBuilderRequest,
+    RepayFixLoanBorrowingOrderRequest, SetAccountLevelRequest, SetAutoLoanRequest,
+    SetAutoRepayRequest, SetGreeksRequest, SetIsolatedModeRequest, SetLeverageRequest,
     SetRiskOffsetTypeRequest, SpotBorrowRepayHistoryParams, SpotManualBorrowRepayRequest,
 };
 use okx_rest::api::funding::{
@@ -555,6 +559,303 @@ impl PyOkxClient {
         self.runtime.block_on(async {
             self.client
                 .set_auto_loan(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 激活期权交易。
+    fn activate_option(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { map_values(self.client.activate_option().await) })
+    }
+
+    /// 设置自动还币。
+    #[pyo3(signature = (auto_repay=None))]
+    fn set_auto_repay(&self, auto_repay: Option<bool>) -> PyResult<Vec<Py<PyAny>>> {
+        let request = SetAutoRepayRequest { auto_repay };
+        self.runtime.block_on(async {
+            self.client
+                .set_auto_repay(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 借币利息抵扣额度及利率。
+    #[pyo3(signature = (type_=None, ccy=None))]
+    fn get_interest_limits(
+        &self,
+        type_: Option<&str>,
+        ccy: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = if type_.is_some() || ccy.is_some() {
+            Some(GetInterestLimitsParams {
+                r#type: type_.map(String::from),
+                ccy: ccy.map(String::from),
+            })
+        } else {
+            None
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_interest_limits(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 尊享借币订单列表。
+    #[pyo3(signature = (ord_id=None, state=None, ccy=None, after=None, before=None, limit=None))]
+    fn get_vip_loan_order_list(
+        &self,
+        ord_id: Option<&str>,
+        state: Option<&str>,
+        ccy: Option<&str>,
+        after: Option<&str>,
+        before: Option<&str>,
+        limit: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = if ord_id.is_some()
+            || state.is_some()
+            || ccy.is_some()
+            || after.is_some()
+            || before.is_some()
+            || limit.is_some()
+        {
+            Some(GetVipLoanOrderListParams {
+                ord_id: ord_id.map(String::from),
+                state: state.map(String::from),
+                ccy: ccy.map(String::from),
+                after: after.map(String::from),
+                before: before.map(String::from),
+                limit: limit.map(String::from),
+            })
+        } else {
+            None
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_vip_loan_order_list(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 尊享借币订单详情。
+    #[pyo3(signature = (ccy=None, ord_id=None, after=None, before=None, limit=None))]
+    fn get_vip_loan_order_detail(
+        &self,
+        ccy: Option<&str>,
+        ord_id: Option<&str>,
+        after: Option<&str>,
+        before: Option<&str>,
+        limit: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = if ccy.is_some()
+            || ord_id.is_some()
+            || after.is_some()
+            || before.is_some()
+            || limit.is_some()
+        {
+            Some(GetVipLoanOrderDetailParams {
+                ccy: ccy.map(String::from),
+                ord_id: ord_id.map(String::from),
+                after: after.map(String::from),
+                before: before.map(String::from),
+                limit: limit.map(String::from),
+            })
+        } else {
+            None
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_vip_loan_order_detail(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币限额。
+    fn get_fix_loan_borrowing_limit(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime.block_on(async {
+            self.client
+                .get_fix_loan_borrowing_limit()
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币报价。
+    #[pyo3(signature = (type_=None, ccy=None, amt=None, max_rate=None, term=None, ord_id=None))]
+    fn get_fix_loan_borrowing_quote(
+        &self,
+        type_: Option<&str>,
+        ccy: Option<&str>,
+        amt: Option<&str>,
+        max_rate: Option<&str>,
+        term: Option<&str>,
+        ord_id: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = if type_.is_some()
+            || ccy.is_some()
+            || amt.is_some()
+            || max_rate.is_some()
+            || term.is_some()
+            || ord_id.is_some()
+        {
+            Some(GetFixLoanBorrowingQuoteParams {
+                r#type: type_.map(String::from),
+                ccy: ccy.map(String::from),
+                amt: amt.map(String::from),
+                max_rate: max_rate.map(String::from),
+                term: term.map(String::from),
+                ord_id: ord_id.map(String::from),
+            })
+        } else {
+            None
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_fix_loan_borrowing_quote(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币下单。
+    #[pyo3(signature = (ccy=None, amt=None, max_rate=None, term=None, reborrow=None, reborrow_rate=None))]
+    fn place_fix_loan_borrowing_order(
+        &self,
+        ccy: Option<&str>,
+        amt: Option<&str>,
+        max_rate: Option<&str>,
+        term: Option<&str>,
+        reborrow: Option<bool>,
+        reborrow_rate: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = FixLoanBorrowingOrderRequest {
+            ccy: ccy.map(String::from),
+            amt: amt.map(String::from),
+            max_rate: max_rate.map(String::from),
+            term: term.map(String::from),
+            reborrow,
+            reborrow_rate: reborrow_rate.map(String::from),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .place_fix_loan_borrowing_order(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 修改定期借币订单。
+    #[pyo3(signature = (ord_id=None, reborrow=None, renew_max_rate=None))]
+    fn amend_fix_loan_borrowing_order(
+        &self,
+        ord_id: Option<&str>,
+        reborrow: Option<bool>,
+        renew_max_rate: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = AmendFixLoanBorrowingOrderRequest {
+            ord_id: ord_id.map(String::from),
+            reborrow,
+            renew_max_rate: renew_max_rate.map(String::from),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .amend_fix_loan_borrowing_order(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币手动续借。
+    #[pyo3(signature = (ord_id=None, max_rate=None))]
+    fn fix_loan_manual_reborrow(
+        &self,
+        ord_id: Option<&str>,
+        max_rate: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = FixLoanManualReborrowRequest {
+            ord_id: ord_id.map(String::from),
+            max_rate: max_rate.map(String::from),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .fix_loan_manual_reborrow(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币还币。
+    #[pyo3(signature = (ord_id=None))]
+    fn repay_fix_loan_borrowing_order(&self, ord_id: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+        let request = RepayFixLoanBorrowingOrderRequest {
+            ord_id: ord_id.map(String::from),
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .repay_fix_loan_borrowing_order(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 定期借币订单列表。
+    #[pyo3(signature = (ord_id=None, ccy=None, state=None, after=None, before=None, limit=None))]
+    fn get_fix_loan_borrowing_orders_list(
+        &self,
+        ord_id: Option<&str>,
+        ccy: Option<&str>,
+        state: Option<&str>,
+        after: Option<&str>,
+        before: Option<&str>,
+        limit: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = if ord_id.is_some()
+            || ccy.is_some()
+            || state.is_some()
+            || after.is_some()
+            || before.is_some()
+            || limit.is_some()
+        {
+            Some(GetFixLoanBorrowingOrdersListParams {
+                ord_id: ord_id.map(String::from),
+                ccy: ccy.map(String::from),
+                state: state.map(String::from),
+                after: after.map(String::from),
+                before: before.map(String::from),
+                limit: limit.map(String::from),
+            })
+        } else {
+            None
+        };
+
+        self.runtime.block_on(async {
+            self.client
+                .get_fix_loan_borrowing_orders_list(params)
                 .await
                 .map_err(to_py_err)
                 .and_then(values_to_py_list)
@@ -2569,10 +2870,88 @@ impl PyOkxClient {
     }
 
     #[pyo3(signature = (params_json=None))]
-    fn simple_earn_get_offers(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+    fn simple_earn_get_lending_offers(
+        &self,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
         let params = parse_json_value(params_json, "params")?;
-        self.runtime
-            .block_on(async { map_values(self.client.simple_earn_get_offers(params).await) })
+        self.runtime.block_on(async {
+            map_values(self.client.simple_earn_get_lending_offers(params).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn simple_earn_get_lending_apy_history(
+        &self,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime.block_on(async {
+            map_values(
+                self.client
+                    .simple_earn_get_lending_apy_history(params)
+                    .await,
+            )
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn simple_earn_get_pending_lending_volume(
+        &self,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime.block_on(async {
+            map_values(
+                self.client
+                    .simple_earn_get_pending_lending_volume(params)
+                    .await,
+            )
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn simple_earn_place_lending_order(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime.block_on(async {
+            map_values(self.client.simple_earn_place_lending_order(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (payload_json))]
+    fn simple_earn_amend_lending_order(&self, payload_json: &str) -> PyResult<Vec<Py<PyAny>>> {
+        let payload = parse_json_value(Some(payload_json), "payload")?
+            .ok_or_else(|| PyRuntimeError::new_err("payload 不能为空"))?;
+        self.runtime.block_on(async {
+            map_values(self.client.simple_earn_amend_lending_order(payload).await)
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn simple_earn_get_lending_orders_list(
+        &self,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime.block_on(async {
+            map_values(
+                self.client
+                    .simple_earn_get_lending_orders_list(params)
+                    .await,
+            )
+        })
+    }
+
+    #[pyo3(signature = (params_json=None))]
+    fn simple_earn_get_lending_sub_orders(
+        &self,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_json_value(params_json, "params")?;
+        self.runtime.block_on(async {
+            map_values(self.client.simple_earn_get_lending_sub_orders(params).await)
+        })
     }
 
     // ==================== Broker ====================

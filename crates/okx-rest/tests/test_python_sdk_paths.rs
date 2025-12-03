@@ -159,28 +159,32 @@ fn finance_endpoints_match_official_sdk() {
             "/api/v5/finance/savings/lending-rate-summary",
         ),
         (
-            finance::endpoints::SIMPLE_EARN_OFFERS,
-            "/api/v5/finance/fixed-loan/borrowable-amount",
+            finance::endpoints::SIMPLE_EARN_LENDING_OFFERS,
+            "/api/v5/finance/fixed-loan/lending-offers",
         ),
         (
-            finance::endpoints::SIMPLE_EARN_APR_HISTORY,
-            "/api/v5/finance/fixed-loan/interest-rate-history",
+            finance::endpoints::SIMPLE_EARN_LENDING_APY_HISTORY,
+            "/api/v5/finance/fixed-loan/lending-apy-history",
         ),
         (
-            finance::endpoints::SIMPLE_EARN_OPEN_ORDERS,
-            "/api/v5/finance/fixed-loan/active-orders",
+            finance::endpoints::SIMPLE_EARN_PENDING_LENDING_VOLUME,
+            "/api/v5/finance/fixed-loan/pending-lending-volume",
         ),
         (
-            finance::endpoints::SIMPLE_EARN_HISTORY_ORDERS,
-            "/api/v5/finance/fixed-loan/history-orders",
+            finance::endpoints::SIMPLE_EARN_LENDING_ORDER,
+            "/api/v5/finance/fixed-loan/lending-order",
         ),
         (
-            finance::endpoints::SIMPLE_EARN_PLACE_ORDER,
-            "/api/v5/finance/fixed-loan/borrow",
+            finance::endpoints::SIMPLE_EARN_AMEND_LENDING_ORDER,
+            "/api/v5/finance/fixed-loan/amend-lending-order",
         ),
         (
-            finance::endpoints::SIMPLE_EARN_REPAY_ORDER,
-            "/api/v5/finance/fixed-loan/repay",
+            finance::endpoints::SIMPLE_EARN_LENDING_ORDERS_LIST,
+            "/api/v5/finance/fixed-loan/lending-orders-list",
+        ),
+        (
+            finance::endpoints::SIMPLE_EARN_LENDING_SUB_ORDERS,
+            "/api/v5/finance/fixed-loan/lending-sub-orders",
         ),
     ];
 
