@@ -1,3 +1,5 @@
+//! okx-core 公共类型与枚举的回归测试。
+
 use okx_core::types::{ApiResponse, Bar, InstType, OrdType, PosSide, Side, TdMode};
 
 #[test]

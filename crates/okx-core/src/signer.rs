@@ -129,7 +129,7 @@ impl Signer {
         let pre_hash = Self::pre_hash(&timestamp, method, request_path, body);
         let signature = Self::sign(&pre_hash, self.credentials.secret_key());
 
-        vec![
+        let mut headers = vec![
             (headers::CONTENT_TYPE, headers::APPLICATION_JSON.to_string()),
             (
                 headers::OK_ACCESS_KEY,
@@ -141,11 +141,13 @@ impl Signer {
                 headers::OK_ACCESS_PASSPHRASE,
                 self.credentials.passphrase().to_string(),
             ),
-            (
-                headers::X_SIMULATED_TRADING,
-                if simulated { "1" } else { "0" }.to_string(),
-            ),
-        ]
+        ];
+
+        if simulated {
+            headers.push((headers::X_SIMULATED_TRADING, "1".to_string()));
+        }
+
+        headers
     }
 
     /// Generate headers for requests that don't require authentication.
@@ -155,13 +157,13 @@ impl Signer {
     /// * `simulated` - Whether to use simulated trading
     #[must_use]
     pub fn generate_public_headers(simulated: bool) -> Vec<(&'static str, String)> {
-        vec![
-            (headers::CONTENT_TYPE, headers::APPLICATION_JSON.to_string()),
-            (
-                headers::X_SIMULATED_TRADING,
-                if simulated { "1" } else { "0" }.to_string(),
-            ),
-        ]
+        let mut headers = vec![(headers::CONTENT_TYPE, headers::APPLICATION_JSON.to_string())];
+
+        if simulated {
+            headers.push((headers::X_SIMULATED_TRADING, "1".to_string()));
+        }
+
+        headers
     }
 
     /// Generate login parameters for WebSocket authentication.
@@ -237,7 +239,7 @@ mod tests {
 
         let headers_live = Signer::generate_public_headers(false);
         let map_live: HashMap<_, _> = headers_live.into_iter().collect();
-        assert_eq!(map_live[headers::X_SIMULATED_TRADING], "0");
+        assert!(!map_live.contains_key(headers::X_SIMULATED_TRADING));
     }
 
     #[test]
@@ -256,6 +258,10 @@ mod tests {
         let pre_hash = Signer::pre_hash(ts, "POST", "/api/v5/unit", body);
         let expected_sign = Signer::sign(&pre_hash, "secret");
         assert_eq!(map[headers::OK_ACCESS_SIGN], expected_sign);
+
+        let headers_live = signer.generate_headers("post", "/api/v5/unit", body, false);
+        let map_live: HashMap<_, _> = headers_live.into_iter().collect();
+        assert!(!map_live.contains_key(headers::X_SIMULATED_TRADING));
     }
 
     #[test]

@@ -1,3 +1,5 @@
+//! okx-core 行情相关类型的回归测试。
+
 use okx_core::types::{BookLevel, Candle, OrderBook};
 
 #[test]

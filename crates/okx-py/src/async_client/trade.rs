@@ -10,6 +10,7 @@ use okx_rest::api::trade::{
     AmendAlgoOrderRequest, ClosePositionRequest, GetAlgoOrderDetailsParams,
     GetAlgoOrdersHistoryParams, GetAlgoOrdersParams, GetFillsHistoryParams, GetFillsParams,
     GetOrderParams, GetOrdersHistoryArchiveParams, GetOrdersHistoryParams, GetOrdersPendingParams,
+    OneClickRepayHistoryV2Params, OneClickRepayV2Request,
 };
 use okx_rest::TradeApi;
 
@@ -788,6 +789,68 @@ impl PyAsyncOkxClient {
         let rest = self.rest_client();
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             rest.order_precheck(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 获取一键还债支持币种列表 v2（异步）。
+    fn get_one_click_repay_currency_list_v2<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = self.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            rest.get_one_click_repay_currency_list_v2()
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 一键还债 v2（异步）。
+    #[pyo3(signature = (debt_ccy, repay_ccy_list))]
+    fn one_click_repay_v2<'py>(
+        &self,
+        py: Python<'py>,
+        debt_ccy: String,
+        repay_ccy_list: Vec<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let request = OneClickRepayV2Request {
+            debt_ccy,
+            repay_ccy_list,
+        };
+        let rest = self.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            rest.one_click_repay_v2(request)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    /// 获取一键还债历史 v2（异步）。
+    #[pyo3(signature = (after=None, before=None, limit=None))]
+    fn get_one_click_repay_history_v2<'py>(
+        &self,
+        py: Python<'py>,
+        after: Option<String>,
+        before: Option<String>,
+        limit: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let params = if after.is_some() || before.is_some() || limit.is_some() {
+            Some(OneClickRepayHistoryV2Params {
+                after,
+                before,
+                limit,
+            })
+        } else {
+            None
+        };
+        let rest = self.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            rest.get_one_click_repay_history_v2(params)
                 .await
                 .map_err(to_py_err)
                 .and_then(values_to_py_list)

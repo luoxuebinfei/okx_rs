@@ -22,7 +22,8 @@ use crate::types::{
     PyMaxSize, PyPosition, PySetLeverageResult, PySetPositionModeResult,
 };
 use crate::{
-    map_values, parse_json_array, parse_json_value, to_py_err, PyAsyncOkxClient, PyOkxClient,
+    map_values, parse_json_array, parse_json_value, to_py_err, values_to_py_list, PyAsyncOkxClient,
+    PyOkxClient,
 };
 
 pub(crate) mod sync {
@@ -60,6 +61,30 @@ pub(crate) mod sync {
                 .await
                 .map(|v| v.into_iter().map(PyPosition::from).collect())
         })
+    }
+
+    pub(crate) fn get_account_instruments(
+        client: &PyOkxClient,
+        inst_type: &str,
+        inst_family: Option<&str>,
+        inst_id: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = okx_rest::api::account::GetAccountInstrumentsParams {
+            inst_type: inst_type.to_string(),
+            inst_family: inst_family.map(String::from),
+            inst_id: inst_id.map(String::from),
+        };
+
+        let values = client.block_on_allow_threads(async {
+            client.rest_client().get_account_instruments(params).await
+        })?;
+        values_to_py_list(values)
+    }
+
+    pub(crate) fn get_account_risk_state(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
+        let values = client
+            .block_on_allow_threads(async { client.rest_client().get_account_risk_state().await })?;
+        values_to_py_list(values)
     }
 
     pub(crate) fn get_account_config(client: &PyOkxClient) -> PyResult<Vec<PyAccountConfig>> {
@@ -946,6 +971,40 @@ pub(crate) mod async_api {
                 .await
                 .map(|v| v.into_iter().map(PyPosition::from).collect::<Vec<_>>())
                 .map_err(to_py_err)
+        })
+    }
+
+    pub(crate) fn get_account_instruments<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        inst_type: String,
+        inst_family: Option<String>,
+        inst_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = okx_rest::api::account::GetAccountInstrumentsParams {
+            inst_type,
+            inst_family,
+            inst_id,
+        };
+
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let values = rest
+                .get_account_instruments(params)
+                .await
+                .map_err(to_py_err)?;
+            values_to_py_list(values)
+        })
+    }
+
+    pub(crate) fn get_account_risk_state<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let values = rest.get_account_risk_state().await.map_err(to_py_err)?;
+            values_to_py_list(values)
         })
     }
 

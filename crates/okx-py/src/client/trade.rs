@@ -10,6 +10,7 @@ use okx_rest::api::trade::{
     AmendAlgoOrderRequest, ClosePositionRequest, GetAlgoOrderDetailsParams,
     GetAlgoOrdersHistoryParams, GetAlgoOrdersParams, GetFillsHistoryParams, GetFillsParams,
     GetOrderParams, GetOrdersHistoryArchiveParams, GetOrdersHistoryParams, GetOrdersPendingParams,
+    OneClickRepayHistoryV2Params, OneClickRepayV2Request,
 };
 use okx_rest::TradeApi;
 
@@ -761,6 +762,55 @@ impl PyOkxClient {
             .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("request 不能为空"))?;
         self.runtime
             .block_on(async { self.client.order_precheck(request).await })
+            .map_err(to_py_err)
+            .and_then(values_to_py_list)
+    }
+
+    /// 获取一键还债支持币种列表 v2。
+    fn get_one_click_repay_currency_list_v2(&self) -> PyResult<Vec<Py<PyAny>>> {
+        self.runtime
+            .block_on(async { self.client.get_one_click_repay_currency_list_v2().await })
+            .map_err(to_py_err)
+            .and_then(values_to_py_list)
+    }
+
+    /// 一键还债 v2。
+    #[pyo3(signature = (debt_ccy, repay_ccy_list))]
+    fn one_click_repay_v2(
+        &self,
+        debt_ccy: &str,
+        repay_ccy_list: Vec<String>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = OneClickRepayV2Request {
+            debt_ccy: debt_ccy.to_string(),
+            repay_ccy_list,
+        };
+        self.runtime
+            .block_on(async { self.client.one_click_repay_v2(request).await })
+            .map_err(to_py_err)
+            .and_then(values_to_py_list)
+    }
+
+    /// 获取一键还债历史 v2。
+    #[pyo3(signature = (after=None, before=None, limit=None))]
+    fn get_one_click_repay_history_v2(
+        &self,
+        after: Option<&str>,
+        before: Option<&str>,
+        limit: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = if after.is_some() || before.is_some() || limit.is_some() {
+            Some(OneClickRepayHistoryV2Params {
+                after: after.map(String::from),
+                before: before.map(String::from),
+                limit: limit.map(String::from),
+            })
+        } else {
+            None
+        };
+
+        self.runtime
+            .block_on(async { self.client.get_one_click_repay_history_v2(params).await })
             .map_err(to_py_err)
             .and_then(values_to_py_list)
     }

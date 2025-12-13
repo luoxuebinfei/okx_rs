@@ -63,6 +63,13 @@ pub mod endpoints {
     pub const CANCEL_ALL_AFTER: &str = "/api/v5/trade/cancel-all-after";
     /// Order precheck
     pub const ORDER_PRECHECK: &str = "/api/v5/trade/order-precheck";
+    /// Get one-click repay currency list v2
+    pub const ONE_CLICK_REPAY_CURRENCY_LIST_V2: &str =
+        "/api/v5/trade/one-click-repay-currency-list-v2";
+    /// One-click repay v2
+    pub const ONE_CLICK_REPAY_V2: &str = "/api/v5/trade/one-click-repay-v2";
+    /// Get one-click repay history v2
+    pub const ONE_CLICK_REPAY_HISTORY_V2: &str = "/api/v5/trade/one-click-repay-history-v2";
 }
 
 /// Query parameters for get_order.
@@ -486,6 +493,43 @@ pub trait TradeApi {
         &self,
         request: serde_json::Value,
     ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get one-click repay currency list v2.
+    fn get_one_click_repay_currency_list_v2(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// One-click repay v2.
+    fn one_click_repay_v2(
+        &self,
+        request: OneClickRepayV2Request,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get one-click repay history v2.
+    fn get_one_click_repay_history_v2(
+        &self,
+        params: Option<OneClickRepayHistoryV2Params>,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+}
+
+/// Request for one-click repay v2.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OneClickRepayV2Request {
+    pub debt_ccy: String,
+    pub repay_ccy_list: Vec<String>,
+}
+
+/// Query parameters for one-click repay history v2.
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OneClickRepayHistoryV2Params {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<String>,
 }
 
 /// Query parameters for get_algo_orders_pending.
@@ -705,5 +749,22 @@ impl TradeApi for OkxRestClient {
 
     async fn order_precheck(&self, request: serde_json::Value) -> Result<Vec<Value>> {
         self.post(endpoints::ORDER_PRECHECK, &request).await
+    }
+
+    async fn get_one_click_repay_currency_list_v2(&self) -> Result<Vec<Value>> {
+        self.get(endpoints::ONE_CLICK_REPAY_CURRENCY_LIST_V2, None::<&()>)
+            .await
+    }
+
+    async fn one_click_repay_v2(&self, request: OneClickRepayV2Request) -> Result<Vec<Value>> {
+        self.post(endpoints::ONE_CLICK_REPAY_V2, &request).await
+    }
+
+    async fn get_one_click_repay_history_v2(
+        &self,
+        params: Option<OneClickRepayHistoryV2Params>,
+    ) -> Result<Vec<Value>> {
+        self.get(endpoints::ONE_CLICK_REPAY_HISTORY_V2, params.as_ref())
+            .await
     }
 }

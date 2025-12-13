@@ -34,6 +34,23 @@ impl PyAsyncOkxClient {
         account_impl::async_api::get_positions(self, py, inst_type, inst_id)
     }
 
+    /// 获取账户可交易产品列表（异步）。
+    #[pyo3(signature = (inst_type, inst_family=None, inst_id=None))]
+    fn get_account_instruments<'py>(
+        &self,
+        py: Python<'py>,
+        inst_type: String,
+        inst_family: Option<String>,
+        inst_id: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        account_impl::async_api::get_account_instruments(self, py, inst_type, inst_family, inst_id)
+    }
+
+    /// 获取账户风险状态（异步）。
+    fn get_account_risk_state<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        account_impl::async_api::get_account_risk_state(self, py)
+    }
+
     /// 获取账户配置（异步）。
     fn get_account_config<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         account_impl::async_api::get_account_config(self, py)

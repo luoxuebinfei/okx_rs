@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use reqwest::{Client, Method, Proxy, Response, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
+use serde_json::Value;
 use tracing::{debug, instrument};
 
 use okx_core::{types::ApiResponse, Config, OkxError, Result, Signer};
@@ -89,6 +90,23 @@ impl OkxRestClient {
         self.parse_response(response).await
     }
 
+    /// Make a GET request to a public endpoint and return the raw JSON response.
+    ///
+    /// This method does not interpret the OKX `code` field and will return the full JSON payload
+    /// on HTTP success.
+    #[instrument(skip(self, params), fields(path = %path))]
+    pub async fn get_public_raw<P>(&self, path: &str, params: Option<&P>) -> Result<Value>
+    where
+        P: Serialize + ?Sized,
+    {
+        let url = self.build_url(path, params)?;
+        debug!("GET (public raw) {}", url);
+
+        let headers = Signer::generate_public_headers(self.config.is_simulated());
+        let response = self.send_request(Method::GET, &url, headers, None).await?;
+        self.parse_response_raw(response).await
+    }
+
     /// Make a GET request to a private endpoint (with authentication).
     ///
     /// # Arguments
@@ -110,6 +128,26 @@ impl OkxRestClient {
                 .generate_headers("GET", &request_path, "", self.config.is_simulated());
         let response = self.send_request(Method::GET, &url, headers, None).await?;
         self.parse_response(response).await
+    }
+
+    /// Make a GET request to a private endpoint (with authentication) and return the raw JSON response.
+    ///
+    /// This method does not interpret the OKX `code` field and will return the full JSON payload
+    /// on HTTP success.
+    #[instrument(skip(self, params), fields(path = %path))]
+    pub async fn get_raw<P>(&self, path: &str, params: Option<&P>) -> Result<Value>
+    where
+        P: Serialize + ?Sized,
+    {
+        let url = self.build_url(path, params)?;
+        let request_path = self.extract_request_path(&url);
+        debug!("GET (private raw) {}", url);
+
+        let headers =
+            self.signer
+                .generate_headers("GET", &request_path, "", self.config.is_simulated());
+        let response = self.send_request(Method::GET, &url, headers, None).await?;
+        self.parse_response_raw(response).await
     }
 
     /// Make a POST request to a private endpoint (with authentication).
@@ -135,6 +173,28 @@ impl OkxRestClient {
             .send_request(Method::POST, &url, headers, Some(body_str))
             .await?;
         self.parse_response(response).await
+    }
+
+    /// Make a POST request to a private endpoint (with authentication) and return the raw JSON response.
+    ///
+    /// This method does not interpret the OKX `code` field and will return the full JSON payload
+    /// on HTTP success.
+    #[instrument(skip(self, body), fields(path = %path))]
+    pub async fn post_raw<B>(&self, path: &str, body: &B) -> Result<Value>
+    where
+        B: Serialize + ?Sized,
+    {
+        let url = format!("{}{}", self.config.rest_url(), path);
+        let body_str = serde_json::to_string(body)?;
+        debug!("POST (private raw) {} body={}", url, body_str);
+
+        let headers =
+            self.signer
+                .generate_headers("POST", path, &body_str, self.config.is_simulated());
+        let response = self
+            .send_request(Method::POST, &url, headers, Some(body_str))
+            .await?;
+        self.parse_response_raw(response).await
     }
 
     /// Build URL with optional query parameters.
@@ -199,6 +259,19 @@ impl OkxRestClient {
         self.parse_body(status, &text)
     }
 
+    /// Parse API response and return the raw JSON payload.
+    async fn parse_response_raw(&self, response: Response) -> Result<Value> {
+        let status = response.status();
+        let text = response
+            .text()
+            .await
+            .map_err(|e| OkxError::Http(format!("Failed to read response: {e}")))?;
+
+        debug!("Raw response status={} body={}", status, text);
+
+        self.parse_body_raw(status, &text)
+    }
+
     /// Parse response body with status code.
     fn parse_body<T: DeserializeOwned>(&self, status: StatusCode, text: &str) -> Result<Vec<T>> {
         if !status.is_success() {
@@ -215,6 +288,18 @@ impl OkxRestClient {
         } else {
             Err(OkxError::api(api_response.code, api_response.msg))
         }
+    }
+
+    /// Parse response body with status code and return the raw JSON payload.
+    fn parse_body_raw(&self, status: StatusCode, text: &str) -> Result<Value> {
+        if !status.is_success() {
+            return Err(OkxError::Http(format!(
+                "HTTP error: status={}, body={}",
+                status, text
+            )));
+        }
+
+        Ok(serde_json::from_str(text)?)
     }
 }
 
@@ -390,6 +475,32 @@ mod tests {
         }
     }
 
+    #[test]
+    fn parse_body_raw_returns_full_payload_even_when_code_is_nonzero() {
+        let body = r#"{"code":"51000","msg":"failure","data":[]}"#;
+        let client = client_with_base("https://example.com");
+
+        let raw = client
+            .parse_body_raw(StatusCode::OK, body)
+            .expect("raw 响应在 HTTP 成功时应返回完整 JSON");
+
+        assert_eq!(raw["code"], "51000");
+        assert_eq!(raw["msg"], "failure");
+        assert!(raw["data"].is_array());
+    }
+
+    #[test]
+    fn parse_body_raw_propagates_http_status_errors() {
+        let body = r#"{"code":"0","msg":"","data":[]}"#;
+        let client = client_with_base("https://example.com");
+
+        let err = client
+            .parse_body_raw(StatusCode::INTERNAL_SERVER_ERROR, body)
+            .expect_err("HTTP 非 2xx 应返回错误");
+
+        assert!(matches!(err, OkxError::Http(_)));
+    }
+
     #[tokio::test]
     async fn parse_response_via_get_public_hits_success_path() {
         // 简易本地 HTTP 服务，返回成功响应，确保走到 parse_response 分支
@@ -411,6 +522,32 @@ mod tests {
             .expect("应成功解析响应");
 
         assert_eq!(data[0].value, 42);
+        handle.join().expect("本地服务线程应正常结束");
+    }
+
+    #[tokio::test]
+    async fn parse_response_raw_via_get_public_raw_returns_full_payload() {
+        // 返回 code!=0，但 HTTP 200，raw 形式应直接返回完整 payload
+        let body = r#"{"code":"51000","msg":"failure","data":[]}"#;
+        let Some((base_url, handle)) = spawn_ok_server("200 OK", body) else {
+            eprintln!("无法绑定本地端口，跳过本用例");
+            return;
+        };
+
+        let client = client_with_base(&base_url);
+        let params = QueryParams {
+            inst_id: "BTC-USDT".into(),
+            limit: None,
+        };
+
+        let raw = client
+            .get_public_raw("/api/v5/mock", Some(&params))
+            .await
+            .expect("raw 调用应成功返回 payload");
+
+        assert_eq!(raw["code"], "51000");
+        assert_eq!(raw["msg"], "failure");
+
         handle.join().expect("本地服务线程应正常结束");
     }
 

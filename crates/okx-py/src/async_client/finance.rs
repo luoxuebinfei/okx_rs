@@ -115,6 +115,187 @@ impl PyAsyncOkxClient {
         finance_impl::async_api::saving_public_lending_rate(self, py, params_json)
     }
 
+    /// 获取余币宝出借利率历史（异步）。
+    #[pyo3(signature = (params_json=None))]
+    fn saving_lending_rate_history<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::saving_lending_rate_history(self, py, params_json)
+    }
+
+    /// Flexible Loan：获取可借币种列表（异步）。
+    fn flexible_loan_borrow_currencies<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::flexible_loan_borrow_currencies(self, py)
+    }
+
+    /// Flexible Loan：获取可作为抵押物的币种列表（异步）。
+    #[pyo3(signature = (params_json=None))]
+    fn flexible_loan_collateral_assets<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::flexible_loan_collateral_assets(self, py, params_json)
+    }
+
+    /// Flexible Loan：查询最大可借额度（异步）。
+    fn flexible_loan_max_loan<'py>(
+        &self,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::flexible_loan_max_loan(self, py, request_json)
+    }
+
+    /// Flexible Loan：查询最大可赎回抵押物数量（异步）。
+    #[pyo3(signature = (params_json=None))]
+    fn flexible_loan_max_collateral_redeem_amount<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::flexible_loan_max_collateral_redeem_amount(self, py, params_json)
+    }
+
+    /// Flexible Loan：调整抵押物（异步）。
+    fn flexible_loan_adjust_collateral<'py>(
+        &self,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::flexible_loan_adjust_collateral(self, py, request_json)
+    }
+
+    /// Flexible Loan：查询借款信息（异步）。
+    fn flexible_loan_loan_info<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::flexible_loan_loan_info(self, py)
+    }
+
+    /// Flexible Loan：查询借款历史（异步）。
+    #[pyo3(signature = (params_json=None))]
+    fn flexible_loan_loan_history<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::flexible_loan_loan_history(self, py, params_json)
+    }
+
+    /// Flexible Loan：查询计息明细（异步）。
+    #[pyo3(signature = (params_json=None))]
+    fn flexible_loan_interest_accrued<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::flexible_loan_interest_accrued(self, py, params_json)
+    }
+
+    /// Staking-Defi（ETH）：获取产品信息（异步）。
+    fn staking_defi_eth_product_info<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_eth_product_info(self, py)
+    }
+
+    /// Staking-Defi（ETH）：获取余额（异步）。
+    fn staking_defi_eth_balance<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_eth_balance(self, py)
+    }
+
+    /// Staking-Defi（ETH）：申购（异步）。
+    fn staking_defi_eth_purchase<'py>(
+        &self,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_eth_purchase(self, py, request_json)
+    }
+
+    /// Staking-Defi（ETH）：赎回（异步）。
+    fn staking_defi_eth_redeem<'py>(
+        &self,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_eth_redeem(self, py, request_json)
+    }
+
+    /// Staking-Defi（ETH）：申购/赎回历史（异步）。
+    #[pyo3(signature = (params_json=None))]
+    fn staking_defi_eth_purchase_redeem_history<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_eth_purchase_redeem_history(self, py, params_json)
+    }
+
+    /// Staking-Defi（ETH）：APY 历史（异步，必填 JSON 参数）。
+    fn staking_defi_eth_apy_history<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_eth_apy_history(self, py, params_json)
+    }
+
+    /// Staking-Defi（SOL）：获取产品信息（异步）。
+    fn staking_defi_sol_product_info<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_sol_product_info(self, py)
+    }
+
+    /// Staking-Defi（SOL）：获取余额（异步）。
+    fn staking_defi_sol_balance<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_sol_balance(self, py)
+    }
+
+    /// Staking-Defi（SOL）：申购（异步）。
+    fn staking_defi_sol_purchase<'py>(
+        &self,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_sol_purchase(self, py, request_json)
+    }
+
+    /// Staking-Defi（SOL）：赎回（异步）。
+    fn staking_defi_sol_redeem<'py>(
+        &self,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_sol_redeem(self, py, request_json)
+    }
+
+    /// Staking-Defi（SOL）：申购/赎回历史（异步）。
+    #[pyo3(signature = (params_json=None))]
+    fn staking_defi_sol_purchase_redeem_history<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_sol_purchase_redeem_history(self, py, params_json)
+    }
+
+    /// Staking-Defi（SOL）：APY 历史（异步，必填 JSON 参数）。
+    fn staking_defi_sol_apy_history<'py>(
+        &self,
+        py: Python<'py>,
+        params_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        finance_impl::async_api::staking_defi_sol_apy_history(self, py, params_json)
+    }
+
     /// 获取 Simple Earn 定期出借产品列表（异步）。
     #[pyo3(signature = (params_json=None))]
     fn simple_earn_get_lending_offers<'py>(

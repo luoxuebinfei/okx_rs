@@ -45,6 +45,10 @@ pub mod endpoints {
     pub const SET_POSITION_MODE: &str = "/api/v5/account/set-position-mode";
     /// Get account position risk
     pub const POSITION_RISK: &str = "/api/v5/account/account-position-risk";
+    /// Get available instruments info of current account
+    pub const INSTRUMENTS: &str = "/api/v5/account/instruments";
+    /// Get account risk state
+    pub const RISK_STATE: &str = "/api/v5/account/risk-state";
     /// Get bills
     pub const BILLS: &str = "/api/v5/account/bills";
     /// Get bills archive
@@ -108,6 +112,20 @@ pub mod endpoints {
     /// Fixed loan borrowing orders list
     pub const FIX_LOAN_BORROWING_ORDERS_LIST: &str =
         "/api/v5/account/fixed-loan/borrowing-orders-list";
+}
+
+/// Query parameters for get_account_instruments.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetAccountInstrumentsParams {
+    /// Instrument type, e.g. SPOT/MARGIN/SWAP/FUTURES/OPTION
+    pub inst_type: String,
+    /// Instrument family, required when inst_type is OPTION
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inst_family: Option<String>,
+    /// Instrument ID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inst_id: Option<String>,
 }
 
 /// Query parameters for get_balance.
@@ -944,6 +962,17 @@ pub trait AccountApi {
         params: Option<GetPositionsParams>,
     ) -> impl std::future::Future<Output = Result<Vec<Position>>> + Send;
 
+    /// Get available instruments info of current account.
+    ///
+    /// ## API Details
+    ///
+    /// - Endpoint: GET /api/v5/account/instruments
+    /// - Permission: Read
+    fn get_account_instruments(
+        &self,
+        params: GetAccountInstrumentsParams,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
     /// Get account configuration.
     ///
     /// Retrieves current account configuration.
@@ -1052,6 +1081,14 @@ pub trait AccountApi {
     fn get_account_position_risk(
         &self,
     ) -> impl std::future::Future<Output = Result<Vec<AccountPositionRisk>>> + Send;
+
+    /// Get account risk state.
+    ///
+    /// ## API Details
+    ///
+    /// - Endpoint: GET /api/v5/account/risk-state
+    /// - Permission: Read
+    fn get_account_risk_state(&self) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
 
     /// Get historical positions (up to 3 months).
     fn get_positions_history(
@@ -1271,6 +1308,13 @@ impl AccountApi for OkxRestClient {
         self.get(endpoints::POSITIONS, params.as_ref()).await
     }
 
+    async fn get_account_instruments(
+        &self,
+        params: GetAccountInstrumentsParams,
+    ) -> Result<Vec<Value>> {
+        self.get(endpoints::INSTRUMENTS, Some(&params)).await
+    }
+
     async fn get_account_config(&self) -> Result<Vec<AccountConfig>> {
         self.get::<AccountConfig, ()>(endpoints::CONFIG, None).await
     }
@@ -1309,6 +1353,10 @@ impl AccountApi for OkxRestClient {
     async fn get_account_position_risk(&self) -> Result<Vec<AccountPositionRisk>> {
         self.get::<AccountPositionRisk, ()>(endpoints::POSITION_RISK, None)
             .await
+    }
+
+    async fn get_account_risk_state(&self) -> Result<Vec<Value>> {
+        self.get(endpoints::RISK_STATE, None::<&()>).await
     }
 
     async fn get_positions_history(

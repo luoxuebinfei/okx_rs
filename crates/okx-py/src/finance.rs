@@ -142,6 +142,234 @@ pub(crate) mod sync {
         map_values(Ok(res))
     }
 
+    pub(crate) fn saving_lending_rate_history(
+        client: &PyOkxClient,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_params(params_json)?;
+        let res = client.block_on_allow_threads(async {
+            client
+                .rest_client()
+                .saving_lending_rate_history(params)
+                .await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn flexible_loan_borrow_currencies(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().flexible_loan_borrow_currencies().await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn flexible_loan_collateral_assets(
+        client: &PyOkxClient,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_params(params_json)?;
+        let res = client.block_on_allow_threads(async {
+            client
+                .rest_client()
+                .flexible_loan_collateral_assets(params)
+                .await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn flexible_loan_max_loan(
+        client: &PyOkxClient,
+        request_json: &str,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = parse_request(request_json)?;
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().flexible_loan_max_loan(request).await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn flexible_loan_max_collateral_redeem_amount(
+        client: &PyOkxClient,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_params(params_json)?;
+        let res = client.block_on_allow_threads(async {
+            client
+                .rest_client()
+                .flexible_loan_max_collateral_redeem_amount(params)
+                .await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn flexible_loan_adjust_collateral(
+        client: &PyOkxClient,
+        request_json: &str,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = parse_request(request_json)?;
+        let res = client.block_on_allow_threads(async {
+            client
+                .rest_client()
+                .flexible_loan_adjust_collateral(request)
+                .await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn flexible_loan_loan_info(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().flexible_loan_loan_info().await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn flexible_loan_loan_history(
+        client: &PyOkxClient,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_params(params_json)?;
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().flexible_loan_loan_history(params).await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn flexible_loan_interest_accrued(
+        client: &PyOkxClient,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_params(params_json)?;
+        let res = client.block_on_allow_threads(async {
+            client
+                .rest_client()
+                .flexible_loan_interest_accrued(params)
+                .await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_eth_product_info(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().staking_defi_eth_product_info().await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_eth_balance(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().staking_defi_eth_balance().await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_eth_purchase(
+        client: &PyOkxClient,
+        request_json: &str,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = parse_request(request_json)?;
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().staking_defi_eth_purchase(request).await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_eth_redeem(
+        client: &PyOkxClient,
+        request_json: &str,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = parse_request(request_json)?;
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().staking_defi_eth_redeem(request).await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_eth_purchase_redeem_history(
+        client: &PyOkxClient,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_params(params_json)?;
+        let res = client.block_on_allow_threads(async {
+            client
+                .rest_client()
+                .staking_defi_eth_purchase_redeem_history(params)
+                .await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_eth_apy_history(
+        client: &PyOkxClient,
+        params_json: &str,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_required_json_value(params_json, "params_json")?;
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().staking_defi_eth_apy_history(params).await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_sol_product_info(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().staking_defi_sol_product_info().await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_sol_balance(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().staking_defi_sol_balance().await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_sol_purchase(
+        client: &PyOkxClient,
+        request_json: &str,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = parse_request(request_json)?;
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().staking_defi_sol_purchase(request).await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_sol_redeem(
+        client: &PyOkxClient,
+        request_json: &str,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let request = parse_request(request_json)?;
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().staking_defi_sol_redeem(request).await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_sol_purchase_redeem_history(
+        client: &PyOkxClient,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_params(params_json)?;
+        let res = client.block_on_allow_threads(async {
+            client
+                .rest_client()
+                .staking_defi_sol_purchase_redeem_history(params)
+                .await
+        })?;
+        map_values(Ok(res))
+    }
+
+    pub(crate) fn staking_defi_sol_apy_history(
+        client: &PyOkxClient,
+        params_json: &str,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = parse_required_json_value(params_json, "params_json")?;
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().staking_defi_sol_apy_history(params).await
+        })?;
+        map_values(Ok(res))
+    }
+
     pub(crate) fn simple_earn_get_lending_offers(
         client: &PyOkxClient,
         params_json: Option<&str>,
@@ -373,6 +601,246 @@ pub(crate) mod async_api {
         let params = parse_params(params_json.as_deref())?;
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             map_values(rest.saving_public_lending_rate(params).await)
+        })
+    }
+
+    pub(crate) fn saving_lending_rate_history<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = parse_params(params_json.as_deref())?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.saving_lending_rate_history(params).await)
+        })
+    }
+
+    pub(crate) fn flexible_loan_borrow_currencies<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.flexible_loan_borrow_currencies().await)
+        })
+    }
+
+    pub(crate) fn flexible_loan_collateral_assets<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = parse_params(params_json.as_deref())?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.flexible_loan_collateral_assets(params).await)
+        })
+    }
+
+    pub(crate) fn flexible_loan_max_loan<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let request = parse_request(&request_json)?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.flexible_loan_max_loan(request).await)
+        })
+    }
+
+    pub(crate) fn flexible_loan_max_collateral_redeem_amount<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = parse_params(params_json.as_deref())?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.flexible_loan_max_collateral_redeem_amount(params).await)
+        })
+    }
+
+    pub(crate) fn flexible_loan_adjust_collateral<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let request = parse_request(&request_json)?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.flexible_loan_adjust_collateral(request).await)
+        })
+    }
+
+    pub(crate) fn flexible_loan_loan_info<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.flexible_loan_loan_info().await)
+        })
+    }
+
+    pub(crate) fn flexible_loan_loan_history<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = parse_params(params_json.as_deref())?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.flexible_loan_loan_history(params).await)
+        })
+    }
+
+    pub(crate) fn flexible_loan_interest_accrued<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = parse_params(params_json.as_deref())?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.flexible_loan_interest_accrued(params).await)
+        })
+    }
+
+    pub(crate) fn staking_defi_eth_product_info<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_eth_product_info().await)
+        })
+    }
+
+    pub(crate) fn staking_defi_eth_balance<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_eth_balance().await)
+        })
+    }
+
+    pub(crate) fn staking_defi_eth_purchase<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let request = parse_request(&request_json)?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_eth_purchase(request).await)
+        })
+    }
+
+    pub(crate) fn staking_defi_eth_redeem<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let request = parse_request(&request_json)?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_eth_redeem(request).await)
+        })
+    }
+
+    pub(crate) fn staking_defi_eth_purchase_redeem_history<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = parse_params(params_json.as_deref())?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_eth_purchase_redeem_history(params).await)
+        })
+    }
+
+    pub(crate) fn staking_defi_eth_apy_history<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        params_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = parse_required_json_value(&params_json, "params_json")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_eth_apy_history(params).await)
+        })
+    }
+
+    pub(crate) fn staking_defi_sol_product_info<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_sol_product_info().await)
+        })
+    }
+
+    pub(crate) fn staking_defi_sol_balance<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_sol_balance().await)
+        })
+    }
+
+    pub(crate) fn staking_defi_sol_purchase<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let request = parse_request(&request_json)?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_sol_purchase(request).await)
+        })
+    }
+
+    pub(crate) fn staking_defi_sol_redeem<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        request_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let request = parse_request(&request_json)?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_sol_redeem(request).await)
+        })
+    }
+
+    pub(crate) fn staking_defi_sol_purchase_redeem_history<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        params_json: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = parse_params(params_json.as_deref())?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_sol_purchase_redeem_history(params).await)
+        })
+    }
+
+    pub(crate) fn staking_defi_sol_apy_history<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        params_json: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = parse_required_json_value(&params_json, "params_json")?;
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            map_values(rest.staking_defi_sol_apy_history(params).await)
         })
     }
 

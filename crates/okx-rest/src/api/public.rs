@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use okx_core::{
     types::{FundingRate, Instrument, MarkPrice},
-    Result,
+    OkxError, Result,
 };
 
 use crate::OkxRestClient;
@@ -38,6 +38,10 @@ pub mod endpoints {
     pub const TIME: &str = "/api/v5/public/time";
     /// Get mark price
     pub const MARK_PRICE: &str = "/api/v5/public/mark-price";
+    /// Get option tick bands
+    pub const INSTRUMENT_TICK_BANDS: &str = "/api/v5/public/instrument-tick-bands";
+    /// Get option trades
+    pub const OPTION_TRADES: &str = "/api/v5/public/option-trades";
     /// Get position tiers
     pub const POSITION_TIERS: &str = "/api/v5/public/position-tiers";
     /// Get interest rate and loan quota
@@ -248,6 +252,27 @@ pub struct SystemTime {
     pub ts: String,
 }
 
+/// Query parameters for option tick bands.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetInstrumentTickBandsParams {
+    pub inst_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inst_family: Option<String>,
+}
+
+/// Query parameters for option trades (public).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetOptionTradesParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inst_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inst_family: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opt_type: Option<String>,
+}
+
 /// Public Data API trait for OKX REST client.
 ///
 /// Provides methods for retrieving public data.
@@ -313,6 +338,20 @@ pub trait PublicApi {
     /// - Rate limit: 10 requests per 2 seconds
     /// - Permission: Public (no auth required)
     fn get_system_time(&self) -> impl std::future::Future<Output = Result<Vec<SystemTime>>> + Send;
+
+    /// Get option tick bands.
+    fn get_instrument_tick_bands(
+        &self,
+        params: GetInstrumentTickBandsParams,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get option trades (public).
+    ///
+    /// Either `inst_id` or `inst_family` must be provided. If both are provided, `inst_id` is used.
+    fn get_option_trades(
+        &self,
+        params: GetOptionTradesParams,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
 
     /// Get delivery/exercise history.
     fn get_delivery_exercise_history(
@@ -413,6 +452,28 @@ impl PublicApi for OkxRestClient {
     async fn get_system_time(&self) -> Result<Vec<SystemTime>> {
         self.get_public::<SystemTime, ()>(endpoints::TIME, None)
             .await
+    }
+
+    async fn get_instrument_tick_bands(
+        &self,
+        params: GetInstrumentTickBandsParams,
+    ) -> Result<Vec<Value>> {
+        self.get_public(endpoints::INSTRUMENT_TICK_BANDS, Some(&params))
+            .await
+    }
+
+    async fn get_option_trades(&self, mut params: GetOptionTradesParams) -> Result<Vec<Value>> {
+        if params.inst_id.is_none() && params.inst_family.is_none() {
+            return Err(OkxError::Other(
+                "Either inst_id or inst_family must be provided".to_string(),
+            ));
+        }
+
+        if params.inst_id.is_some() {
+            params.inst_family = None;
+        }
+
+        self.get_public(endpoints::OPTION_TRADES, Some(&params)).await
     }
 
     async fn get_delivery_exercise_history(

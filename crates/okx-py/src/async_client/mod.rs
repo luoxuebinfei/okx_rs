@@ -35,6 +35,7 @@ mod funding;
 mod grid;
 mod market;
 mod public;
+mod raw;
 mod spread;
 mod subaccount;
 mod trade;

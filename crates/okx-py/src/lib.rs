@@ -58,6 +58,7 @@ mod finance;
 mod funding;
 mod grid;
 mod public;
+mod raw;
 mod spread;
 mod subaccount;
 mod trading_data;
@@ -113,6 +114,17 @@ pub(crate) fn values_to_py_list(values: Vec<Value>) -> PyResult<Vec<Py<PyAny>>> 
                 Ok(obj.into())
             })
             .collect()
+    })
+}
+
+/// 将单个 `serde_json::Value` 转换为 Python 对象。
+pub(crate) fn value_to_py_obj(value: Value) -> PyResult<Py<PyAny>> {
+    Python::attach(|py| {
+        let json = PyModule::import(py, "json")?;
+        let s = serde_json::to_string(&value)
+            .map_err(|e| PyRuntimeError::new_err(format!("序列化失败: {e}")))?;
+        let obj = json.call_method1("loads", (s,))?;
+        Ok(obj.into())
     })
 }
 

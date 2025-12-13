@@ -184,12 +184,50 @@ impl PyOkxClient {
         public_impl::sync::get_index_tickers(self, quote_ccy, inst_id)
     }
 
+    /// 获取平台 24 小时总成交量。
+    fn get_platform_24_volume(&self) -> PyResult<Vec<Py<PyAny>>> {
+        public_impl::sync::get_platform_24_volume(self)
+    }
+
+    /// 获取指数成分数据。
+    fn get_index_components(&self, index: &str) -> PyResult<Vec<Py<PyAny>>> {
+        public_impl::sync::get_index_components(self, index)
+    }
+
+    /// 获取汇率。
+    fn get_exchange_rate(&self) -> PyResult<Vec<Py<PyAny>>> {
+        public_impl::sync::get_exchange_rate(self)
+    }
+
     // ==================== Public API ====================
 
     /// 获取交易产品基础信息。
     #[pyo3(signature = (inst_type, inst_id=None))]
     fn get_instruments(&self, inst_type: &str, inst_id: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
         public_impl::sync::get_instruments(self, inst_type, inst_id)
+    }
+
+    /// 获取期权产品报价最小变动价位（Tick Bands）。
+    #[pyo3(signature = (inst_type, inst_family=None))]
+    fn get_instrument_tick_bands(
+        &self,
+        inst_type: &str,
+        inst_family: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        public_impl::sync::get_instrument_tick_bands(self, inst_type, inst_family)
+    }
+
+    /// 获取公共期权成交数据。
+    ///
+    /// `inst_id` 与 `inst_family` 至少提供一个；如两者都提供，则优先使用 `inst_id`（底层与 Rust 实现一致）。
+    #[pyo3(signature = (inst_id=None, inst_family=None, opt_type=None))]
+    fn get_option_trades(
+        &self,
+        inst_id: Option<&str>,
+        inst_family: Option<&str>,
+        opt_type: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        public_impl::sync::get_option_trades(self, inst_id, inst_family, opt_type)
     }
 
     /// 获取交割/行权历史。

@@ -3,14 +3,15 @@
 use pyo3::prelude::*;
 
 use okx_rest::api::market::{
-    GetBlockTickersParams, GetCandlesParams, GetHistoryTradesParams, GetIndexTickersParams,
-    GetMarkPriceCandlesParams, GetTickersParams,
+    GetBlockTickersParams, GetCandlesParams, GetHistoryTradesParams, GetIndexComponentsParams,
+    GetIndexTickersParams, GetMarkPriceCandlesParams, GetTickersParams,
 };
 use okx_rest::api::public::{
     GetConvertContractCoinParams, GetDeliveryExerciseHistoryParams, GetDiscountQuotaParams,
     GetEstimatedPriceParams, GetFundingRateHistoryParams, GetInstrumentsParams,
-    GetInsuranceFundParams, GetMarkPriceParams, GetOpenInterestParams, GetOptSummaryParams,
-    GetPositionTiersParams, GetPriceLimitParams, GetUnderlyingParams,
+    GetInstrumentTickBandsParams, GetInsuranceFundParams, GetMarkPriceParams, GetOpenInterestParams,
+    GetOptSummaryParams, GetOptionTradesParams, GetPositionTiersParams, GetPriceLimitParams,
+    GetUnderlyingParams,
 };
 use okx_rest::{MarketApi, PublicApi, StatusApi};
 
@@ -232,6 +233,33 @@ pub(crate) mod sync {
         })
     }
 
+    pub(crate) fn get_platform_24_volume(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().get_platform_24_volume().await
+        })?;
+        values_to_py_list(res)
+    }
+
+    pub(crate) fn get_index_components(
+        client: &PyOkxClient,
+        index: &str,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = GetIndexComponentsParams {
+            index: index.to_string(),
+        };
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().get_index_components(params).await
+        })?;
+        values_to_py_list(res)
+    }
+
+    pub(crate) fn get_exchange_rate(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().get_exchange_rate().await
+        })?;
+        values_to_py_list(res)
+    }
+
     pub(crate) fn get_instruments(
         client: &PyOkxClient,
         inst_type: &str,
@@ -262,6 +290,38 @@ pub(crate) mod sync {
                 })
                 .collect::<PyResult<Vec<Py<PyAny>>>>()
         })
+    }
+
+    pub(crate) fn get_instrument_tick_bands(
+        client: &PyOkxClient,
+        inst_type: &str,
+        inst_family: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = GetInstrumentTickBandsParams {
+            inst_type: inst_type.to_string(),
+            inst_family: inst_family.map(String::from),
+        };
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().get_instrument_tick_bands(params).await
+        })?;
+        values_to_py_list(res)
+    }
+
+    pub(crate) fn get_option_trades(
+        client: &PyOkxClient,
+        inst_id: Option<&str>,
+        inst_family: Option<&str>,
+        opt_type: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        let params = GetOptionTradesParams {
+            inst_id: inst_id.map(String::from),
+            inst_family: inst_family.map(String::from),
+            opt_type: opt_type.map(String::from),
+        };
+        let res = client.block_on_allow_threads(async {
+            client.rest_client().get_option_trades(params).await
+        })?;
+        values_to_py_list(res)
     }
 
     pub(crate) fn get_delivery_exercise_history(
@@ -785,6 +845,47 @@ pub(crate) mod async_api {
         })
     }
 
+    pub(crate) fn get_platform_24_volume<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            rest.get_platform_24_volume()
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    pub(crate) fn get_index_components<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        index: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = GetIndexComponentsParams { index };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            rest.get_index_components(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    pub(crate) fn get_exchange_rate<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            rest.get_exchange_rate()
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
     pub(crate) fn get_instruments<'py>(
         client: &PyAsyncOkxClient,
         py: Python<'py>,
@@ -817,6 +918,46 @@ pub(crate) mod async_api {
                     })
                     .collect::<PyResult<Vec<Py<PyAny>>>>()
             })
+        })
+    }
+
+    pub(crate) fn get_instrument_tick_bands<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        inst_type: String,
+        inst_family: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = GetInstrumentTickBandsParams {
+            inst_type,
+            inst_family,
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            rest.get_instrument_tick_bands(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
+        })
+    }
+
+    pub(crate) fn get_option_trades<'py>(
+        client: &PyAsyncOkxClient,
+        py: Python<'py>,
+        inst_id: Option<String>,
+        inst_family: Option<String>,
+        opt_type: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let rest = client.rest_client();
+        let params = GetOptionTradesParams {
+            inst_id,
+            inst_family,
+            opt_type,
+        };
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            rest.get_option_trades(params)
+                .await
+                .map_err(to_py_err)
+                .and_then(values_to_py_list)
         })
     }
 

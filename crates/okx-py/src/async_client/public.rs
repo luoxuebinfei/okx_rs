@@ -108,6 +108,25 @@ impl PyAsyncOkxClient {
         public_impl::async_api::get_index_tickers(self, py, quote_ccy, inst_id)
     }
 
+    /// 获取平台 24 小时总成交量（异步）。
+    fn get_platform_24_volume<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        public_impl::async_api::get_platform_24_volume(self, py)
+    }
+
+    /// 获取指数成分数据（异步）。
+    fn get_index_components<'py>(
+        &self,
+        py: Python<'py>,
+        index: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        public_impl::async_api::get_index_components(self, py, index)
+    }
+
+    /// 获取汇率（异步）。
+    fn get_exchange_rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        public_impl::async_api::get_exchange_rate(self, py)
+    }
+
     /// 获取交易产品基础信息（异步）。
     #[pyo3(signature = (inst_type, inst_id=None))]
     fn get_instruments<'py>(
@@ -117,6 +136,31 @@ impl PyAsyncOkxClient {
         inst_id: Option<String>,
     ) -> PyResult<Bound<'py, PyAny>> {
         public_impl::async_api::get_instruments(self, py, inst_type, inst_id)
+    }
+
+    /// 获取期权产品报价最小变动价位（Tick Bands，异步）。
+    #[pyo3(signature = (inst_type, inst_family=None))]
+    fn get_instrument_tick_bands<'py>(
+        &self,
+        py: Python<'py>,
+        inst_type: String,
+        inst_family: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        public_impl::async_api::get_instrument_tick_bands(self, py, inst_type, inst_family)
+    }
+
+    /// 获取公共期权成交数据（异步）。
+    ///
+    /// `inst_id` 与 `inst_family` 至少提供一个；如两者都提供，则优先使用 `inst_id`（底层与 Rust 实现一致）。
+    #[pyo3(signature = (inst_id=None, inst_family=None, opt_type=None))]
+    fn get_option_trades<'py>(
+        &self,
+        py: Python<'py>,
+        inst_id: Option<String>,
+        inst_family: Option<String>,
+        opt_type: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        public_impl::async_api::get_option_trades(self, py, inst_id, inst_family, opt_type)
     }
 
     /// 获取当前资金费率（异步）。

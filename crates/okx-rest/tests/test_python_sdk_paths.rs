@@ -86,6 +86,8 @@ fn account_endpoints_match_official_sdk() {
             account::endpoints::SET_AUTO_LOAN,
             "/api/v5/account/set-auto-loan",
         ),
+        (account::endpoints::INSTRUMENTS, "/api/v5/account/instruments"),
+        (account::endpoints::RISK_STATE, "/api/v5/account/risk-state"),
     ];
 
     for (actual, expected) in cases {
@@ -159,6 +161,90 @@ fn finance_endpoints_match_official_sdk() {
             "/api/v5/finance/savings/lending-rate-summary",
         ),
         (
+            finance::endpoints::SAVING_LENDING_RATE_HISTORY,
+            "/api/v5/finance/savings/lending-rate-history",
+        ),
+        (
+            finance::endpoints::FLEXIBLE_LOAN_BORROW_CURRENCIES,
+            "/api/v5/finance/flexible-loan/borrow-currencies",
+        ),
+        (
+            finance::endpoints::FLEXIBLE_LOAN_COLLATERAL_ASSETS,
+            "/api/v5/finance/flexible-loan/collateral-assets",
+        ),
+        (
+            finance::endpoints::FLEXIBLE_LOAN_MAX_LOAN,
+            "/api/v5/finance/flexible-loan/max-loan",
+        ),
+        (
+            finance::endpoints::FLEXIBLE_LOAN_LOAN_INFO,
+            "/api/v5/finance/flexible-loan/loan-info",
+        ),
+        (
+            finance::endpoints::FLEXIBLE_LOAN_LOAN_HISTORY,
+            "/api/v5/finance/flexible-loan/loan-history",
+        ),
+        (
+            finance::endpoints::FLEXIBLE_LOAN_INTEREST_ACCRUED,
+            "/api/v5/finance/flexible-loan/interest-accrued",
+        ),
+        (
+            finance::endpoints::FLEXIBLE_LOAN_MAX_REDEEM_AMOUNT,
+            "/api/v5/finance/flexible-loan/max-collateral-redeem-amount",
+        ),
+        (
+            finance::endpoints::FLEXIBLE_LOAN_ADJUST_COLLATERAL,
+            "/api/v5/finance/flexible-loan/adjust-collateral",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_ETH_PRODUCT_INFO,
+            "/api/v5/finance/staking-defi/eth/product-info",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_ETH_BALANCE,
+            "/api/v5/finance/staking-defi/eth/balance",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_ETH_APY_HISTORY,
+            "/api/v5/finance/staking-defi/eth/apy-history",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_ETH_PURCHASE,
+            "/api/v5/finance/staking-defi/eth/purchase",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_ETH_REDEEM,
+            "/api/v5/finance/staking-defi/eth/redeem",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_ETH_PURCHASE_REDEEM_HISTORY,
+            "/api/v5/finance/staking-defi/eth/purchase-redeem-history",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_SOL_PRODUCT_INFO,
+            "/api/v5/finance/staking-defi/sol/product-info",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_SOL_BALANCE,
+            "/api/v5/finance/staking-defi/sol/balance",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_SOL_APY_HISTORY,
+            "/api/v5/finance/staking-defi/sol/apy-history",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_SOL_PURCHASE,
+            "/api/v5/finance/staking-defi/sol/purchase",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_SOL_REDEEM,
+            "/api/v5/finance/staking-defi/sol/redeem",
+        ),
+        (
+            finance::endpoints::STAKING_DEFI_SOL_PURCHASE_REDEEM_HISTORY,
+            "/api/v5/finance/staking-defi/sol/purchase-redeem-history",
+        ),
+        (
             finance::endpoints::SIMPLE_EARN_LENDING_OFFERS,
             "/api/v5/finance/fixed-loan/lending-offers",
         ),
@@ -220,6 +306,18 @@ fn trade_endpoints_match_official_sdk() {
         (
             trade::endpoints::ORDER_PRECHECK,
             "/api/v5/trade/order-precheck",
+        ),
+        (
+            trade::endpoints::ONE_CLICK_REPAY_CURRENCY_LIST_V2,
+            "/api/v5/trade/one-click-repay-currency-list-v2",
+        ),
+        (
+            trade::endpoints::ONE_CLICK_REPAY_V2,
+            "/api/v5/trade/one-click-repay-v2",
+        ),
+        (
+            trade::endpoints::ONE_CLICK_REPAY_HISTORY_V2,
+            "/api/v5/trade/one-click-repay-history-v2",
         ),
     ];
 
@@ -608,6 +706,18 @@ fn market_endpoints_match_official_sdk() {
             market::endpoints::OPTION_FAMILY_TRADES,
             "/api/v5/market/option/instrument-family-trades",
         ),
+        (
+            market::endpoints::PLATFORM_24_VOLUME,
+            "/api/v5/market/platform-24-volume",
+        ),
+        (
+            market::endpoints::INDEX_COMPONENTS,
+            "/api/v5/market/index-components",
+        ),
+        (
+            market::endpoints::EXCHANGE_RATE,
+            "/api/v5/market/exchange-rate",
+        ),
     ];
 
     for (actual, expected) in cases {
@@ -638,6 +748,11 @@ fn public_endpoints_match_official_sdk() {
             public::endpoints::VIP_INTEREST_RATE_LOAN_QUOTA,
             "/api/v5/public/vip-interest-rate-loan-quota",
         ),
+        (
+            public::endpoints::INSTRUMENT_TICK_BANDS,
+            "/api/v5/public/instrument-tick-bands",
+        ),
+        (public::endpoints::OPTION_TRADES, "/api/v5/public/option-trades"),
     ];
 
     for (actual, expected) in cases {

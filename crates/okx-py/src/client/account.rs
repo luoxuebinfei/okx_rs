@@ -32,6 +32,17 @@ impl PyOkxClient {
         account_impl::sync::get_positions(self, inst_type, inst_id)
     }
 
+    /// 获取当前账户可用交易产品信息。
+    #[pyo3(signature = (inst_type, inst_family=None, inst_id=None))]
+    fn get_account_instruments(
+        &self,
+        inst_type: &str,
+        inst_family: Option<&str>,
+        inst_id: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        account_impl::sync::get_account_instruments(self, inst_type, inst_family, inst_id)
+    }
+
     /// 获取账户配置。
     fn get_account_config(&self) -> PyResult<Vec<PyAccountConfig>> {
         account_impl::sync::get_account_config(self)
@@ -161,6 +172,11 @@ impl PyOkxClient {
     /// 获取账户风险。
     fn get_account_position_risk(&self) -> PyResult<Vec<PyAccountPositionRisk>> {
         account_impl::sync::get_account_position_risk(self)
+    }
+
+    /// 获取账户风险状态。
+    fn get_account_risk_state(&self) -> PyResult<Vec<Py<PyAny>>> {
+        account_impl::sync::get_account_risk_state(self)
     }
 
     /// 获取历史持仓。

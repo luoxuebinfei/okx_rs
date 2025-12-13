@@ -23,17 +23,43 @@ PyPI 发布准备见 `docs/zh/release.md`。
 - `cancel_order(inst_id, ord_id=None, cl_ord_id=None)` → `/api/v5/trade/cancel-order`
 - `get_order(inst_id, ord_id=None, cl_ord_id=None)` → `/api/v5/trade/order`
 - `get_orders_pending(inst_type=None, inst_id=None)` → `/api/v5/trade/orders-pending`
+- `get_account_instruments(inst_type, inst_family=None, inst_id=None)` → `/api/v5/account/instruments`
+- `get_account_risk_state()` → `/api/v5/account/risk-state`
 - 公共行情：
   - `get_ticker(inst_id)` → `/api/v5/market/ticker`
   - `get_tickers(inst_type)` → `/api/v5/market/tickers`
+  - `get_platform_24_volume()` → `/api/v5/market/platform-24-volume`
+  - `get_index_components(index)` → `/api/v5/market/index-components`
+  - `get_exchange_rate()` → `/api/v5/market/exchange-rate`
   - `get_instruments(inst_type, inst_id=None)` → `/api/v5/public/instruments`
-- 公共服务：`get_system_time()` → `/api/v5/public/system-time`
+- 公共服务：`get_system_time()` → `/api/v5/public/time`
+- 公共数据：
+  - `get_instrument_tick_bands(inst_type, inst_family=None)` → `/api/v5/public/instrument-tick-bands`
+  - `get_option_trades(inst_id=None, inst_family=None, opt_type=None)` → `/api/v5/public/option-trades`
+- Finance：
+  - `saving_lending_rate_history(params_json=None)` → `/api/v5/finance/savings/lending-rate-history`
+  - `flexible_loan_*` → `/api/v5/finance/flexible-loan/*`
+  - `staking_defi_eth_*` / `staking_defi_sol_*` → `/api/v5/finance/staking-defi/{eth,sol}/*`
+- 一键还债（v2）：
+  - `get_one_click_repay_currency_list_v2()` → `/api/v5/trade/one-click-repay-currency-list-v2`
+  - `one_click_repay_v2(debt_ccy, repay_ccy_list)` → `/api/v5/trade/one-click-repay-v2`
+  - `get_one_click_repay_history_v2(after=None, before=None, limit=None)` → `/api/v5/trade/one-click-repay-history-v2`
 
 ## 异步 REST 客户端 `AsyncOkxClient`
 来源：`crates/okx-py/src/async_client/mod.rs`（绑定入口）与 `crates/okx-py/src/async_client/*.rs`（按业务域拆分）。方法集合与 `OkxClient` 对齐，返回 `await` 后的结果：
 - `get_balance`, `get_positions`, `place_order`, `cancel_order`, `get_order`, `get_orders_pending`
 - 公共行情：`get_ticker`, `get_tickers`, `get_instruments`
 - 公共服务：`get_system_time`
+
+## 官方兼容返回（Raw Response）
+
+为对齐官方 `python-okx` “返回完整 JSON（code/msg/data）” 的使用习惯，Python 绑定额外提供 raw 形式的通用接口（不影响既有类型化返回）：
+
+- 同步 `OkxClient`：
+  - `get_public_raw(path, params_json=None)`：公共 GET，返回完整 JSON 字典
+  - `get_private_raw(path, params_json=None)`：私有 GET，返回完整 JSON 字典
+  - `post_private_raw(path, body_json)`：私有 POST，返回完整 JSON 字典
+- 异步 `AsyncOkxClient`：提供同名方法（返回 awaitable）。
 
 ## 覆盖范围与缺失
 - 已暴露（REST）：账户余额、持仓、下单/撤单/查单、待成交、单/多 ticker、合约列表、服务器时间。
@@ -53,7 +79,7 @@ PyPI 发布准备见 `docs/zh/release.md`。
 | 单一 ticker | `GET /api/v5/market/ticker` | `client.get_ticker(inst_id)` / 异步同名 | `inst_id` 必填 |
 | 全部 ticker（按类型） | `GET /api/v5/market/tickers` | `client.get_tickers(inst_type)` / 异步同名 | `inst_type` 必填 |
 | 合约/币对列表 | `GET /api/v5/public/instruments` | `client.get_instruments(inst_type, inst_id=None)` / 异步同名 | `inst_type` 必填，`inst_id` 可选 |
-| 服务器时间 | `GET /api/v5/public/system-time` | `client.get_system_time()` / 异步同名 | 无 |
+| 服务器时间 | `GET /api/v5/public/time` | `client.get_system_time()` / 异步同名 | 无 |
 | 系统状态 | `GET /api/v5/system/status` | `client.get_system_status(state=None)` / 异步同名 | `state` 可选（`0` 正常，`1` 维护） |
 | 调整持仓保证金 | `POST /api/v5/account/position/margin-balance` | `client.adjustment_margin(inst_id, pos_side, type_, amt, loan_trans=None)` / 异步同名 | `inst_id`、`pos_side`、`type_`(`add/reduce`)、`amt`，`loan_trans` 可选 |
 | 设置风险对冲类型 | `POST /api/v5/account/set-riskOffset-type` | `client.set_risk_offset_type(type_)` / 异步同名 | `type_` 必填 |

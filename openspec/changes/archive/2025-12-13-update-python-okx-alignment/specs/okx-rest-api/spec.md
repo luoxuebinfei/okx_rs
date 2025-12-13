@@ -1,35 +1,4 @@
-# okx-rest-api Specification
-
-## Purpose
-TBD - created by archiving change add-okx-rust-sdk. Update Purpose after archive.
-## Requirements
-### Requirement: HTTP 客户端基类
-
-系统 SHALL 提供异步 HTTP 客户端基类，处理所有 REST API 请求。
-
-客户端 SHALL 支持：
-- 自动签名所有认证请求
-- 连接池管理
-- 超时配置
-- 代理支持
-- 自动重试（可配置）
-
-#### Scenario: 发送认证 GET 请求
-- **WHEN** 调用需要认证的 GET 端点
-- **THEN** 系统自动添加签名头
-- **AND** 返回解析后的响应
-
-#### Scenario: 发送 POST 请求
-- **WHEN** 调用 POST 端点并传入参数
-- **THEN** 系统将参数序列化为 JSON
-- **AND** 自动添加签名头
-- **AND** 返回解析后的响应
-
-#### Scenario: 配置代理
-- **WHEN** 用户配置 HTTP 代理
-- **THEN** 所有请求通过代理发送
-
----
+## MODIFIED Requirements
 
 ### Requirement: Account API
 
@@ -148,42 +117,6 @@ TBD - created by archiving change add-okx-rust-sdk. Update Purpose after archive
 
 ---
 
-### Requirement: Funding API
-
-系统 SHALL 实现资金管理 API，与 OKX `/api/v5/asset/*` 端点对应。
-
-#### Scenario: 获取资金账户余额
-- **WHEN** 调用 `get_balances(ccy: Option<String>)`
-- **THEN** 系统 GET `/api/v5/asset/balances`
-- **AND** 返回 `Vec<FundingBalance>`
-
-#### Scenario: 资金划转
-- **WHEN** 调用 `transfer(ccy: String, amt: String, from: String, to: String)`
-- **THEN** 系统 POST 到 `/api/v5/asset/transfer`
-- **AND** 返回划转 ID
-
-#### Scenario: 提现
-- **WHEN** 调用 `withdrawal(request: WithdrawalRequest)`
-- **THEN** 系统 POST 到 `/api/v5/asset/withdrawal`
-- **AND** 返回提现 ID
-
-#### Scenario: 获取充值地址
-- **WHEN** 调用 `get_deposit_address(ccy: String)`
-- **THEN** 系统 GET `/api/v5/asset/deposit-address`
-- **AND** 返回 `Vec<DepositAddress>`
-
-#### Scenario: 获取充值记录
-- **WHEN** 调用 `get_deposit_history(ccy: Option<String>)`
-- **THEN** 系统 GET `/api/v5/asset/deposit-history`
-- **AND** 返回 `Vec<DepositRecord>`
-
-#### Scenario: 获取提现记录
-- **WHEN** 调用 `get_withdrawal_history(ccy: Option<String>)`
-- **THEN** 系统 GET `/api/v5/asset/withdrawal-history`
-- **AND** 返回 `Vec<WithdrawalRecord>`
-
----
-
 ### Requirement: Market Data API
 
 系统 SHALL 实现行情数据 API，与 OKX `/api/v5/market/*` 端点对应。
@@ -267,4 +200,3 @@ TBD - created by archiving change add-okx-rust-sdk. Update Purpose after archive
 - **WHEN** 调用 `get_option_trades(inst_id: Option<String>, inst_family: Option<String>, opt_type: Option<String>)`
 - **THEN** 系统 GET `/api/v5/public/option-trades`
 - **AND** 返回与官方结构一致的数据列表
-

@@ -26,15 +26,19 @@
 - **OkxRestClient**（`crates/okx-rest/src/client.rs`）
   - 构造：`OkxRestClient::new(config)`；也可 `with_http_client` 注入自定义 `reqwest::Client`。
   - 公共 GET：`get_public(path, params)` → 自动拼接查询参数、公共头。
+  - 公共 GET（raw）：`get_public_raw(path, params)` → HTTP 成功时返回完整 JSON（不解读 `code`）。
   - 私有 GET：`get(path, params)` → 自动签名，`request_path` 含查询串。
+  - 私有 GET（raw）：`get_raw(path, params)` → HTTP 成功时返回完整 JSON（不解读 `code`）。
   - 私有 POST：`post(path, body)` → 序列化 body，签名后发送。
+  - 私有 POST（raw）：`post_raw(path, body)` → HTTP 成功时返回完整 JSON（不解读 `code`）。
   - 解析：OKX 响应 `ApiResponse<T>`，`code == "0"` 返回 `Vec<T>`，否则 `OkxError::Api`。
 - **API 模块与官方路径**（常量位于各 `endpoints` 模块，均来源于官方文档）
-  - Account（`account.rs`）：`/api/v5/account/balance`、`/positions`、`/config`、`/set-leverage`、`/leverage-info`、`/max-size`、`/max-avail-size`、`/trade-fee`、`/set-position-mode`、`/account-position-risk`。参数结构：`GetBalanceParams`、`GetPositionsParams`、`SetLeverageRequest`、`GetLeverageInfoParams`、`GetMaxSizeParams`、`GetMaxAvailSizeParams`、`GetFeeRatesParams` 等。
-  - Trade（`trade.rs`）：`/api/v5/trade/order`、`/cancel-order`、`/amend-order`、`/orders-pending`、`/orders-history`、`/fills`、`/order-algo`、`/cancel-algos`、`/algo-orders-pending`、`/algo-orders-history`、`/close-position`。批量接口使用列表体。
+  - Account（`account.rs`）：`/api/v5/account/balance`、`/positions`、`/config`、`/set-leverage`、`/leverage-info`、`/max-size`、`/max-avail-size`、`/trade-fee`、`/set-position-mode`、`/account-position-risk`、`/instruments`、`/risk-state`。参数结构：`GetBalanceParams`、`GetPositionsParams`、`SetLeverageRequest`、`GetLeverageInfoParams`、`GetMaxSizeParams`、`GetMaxAvailSizeParams`、`GetFeeRatesParams` 等。
+  - Trade（`trade.rs`）：`/api/v5/trade/order`、`/cancel-order`、`/amend-order`、`/orders-pending`、`/orders-history`、`/fills`、`/order-algo`、`/cancel-algos`、`/algo-orders-pending`、`/algo-orders-history`、`/close-position`、`/one-click-repay-*-v2`。批量接口使用列表体。
   - Funding（`funding.rs`）：`/api/v5/asset/balances`、`/asset/deposit-address`、`/asset/deposit-history`、`/asset/withdrawal-history`、`/asset/transfer`、`/asset/withdrawal`、`/asset/currencies`。
-  - Market（`market.rs`）：`/api/v5/market/tickers`、`/ticker`、`/books`（及 books5/books50/books-l2-tbt）、`/candles`、`/trades`、`/index-tickers`。
-  - Public（`public.rs`）：`/api/v5/public/instruments`、`/funding-rate`、`/funding-rate-history`、`/system-time`、`/mark-price`。
+  - Finance（`finance.rs`）：`/api/v5/finance/staking-defi/*`、`/api/v5/finance/savings/*`（含 `lending-rate-history`）、`/api/v5/finance/flexible-loan/*`、`/api/v5/finance/staking-defi/{eth,sol}/*`、simple earn fixed loan 端点族。
+  - Market（`market.rs`）：`/api/v5/market/tickers`、`/ticker`、`/books`（及 books5/books50/books-l2-tbt）、`/candles`、`/trades`、`/index-tickers`、`/platform-24-volume`、`/index-components`、`/exchange-rate`。
+  - Public（`public.rs`）：`/api/v5/public/instruments`、`/funding-rate`、`/funding-rate-history`、`/time`、`/mark-price`、`/instrument-tick-bands`、`/option-trades`。
 - **返回值**：所有方法返回 `Result<Vec<T>>` 或对应列表，字段名与官方响应保持一致。
 - **示例**：详见仓库 `crates/okx-rest/examples/rest_basic.rs`。
 

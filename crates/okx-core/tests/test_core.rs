@@ -179,7 +179,8 @@ mod signer_tests {
         assert!(headers.iter().any(|(k, _)| *k == "OK-ACCESS-SIGN"));
         assert!(headers.iter().any(|(k, _)| *k == "OK-ACCESS-TIMESTAMP"));
         assert!(headers.iter().any(|(k, _)| *k == "OK-ACCESS-PASSPHRASE"));
-        assert!(headers.iter().any(|(k, _)| *k == "x-simulated-trading"));
+        // 按对齐策略：仅在 simulated=true 时发送 x-simulated-trading: 1
+        assert!(!headers.iter().any(|(k, _)| *k == "x-simulated-trading"));
     }
 
     #[test]
@@ -199,9 +200,20 @@ mod signer_tests {
     fn test_generate_public_headers() {
         let headers = Signer::generate_public_headers(false);
         assert!(headers.iter().any(|(k, _)| *k == "Content-Type"));
-        assert!(headers.iter().any(|(k, _)| *k == "x-simulated-trading"));
+        // 按对齐策略：仅在 simulated=true 时发送 x-simulated-trading: 1
+        assert!(!headers.iter().any(|(k, _)| *k == "x-simulated-trading"));
         // Should NOT have auth headers
         assert!(!headers.iter().any(|(k, _)| *k == "OK-ACCESS-KEY"));
+    }
+
+    #[test]
+    fn test_generate_public_headers_simulated() {
+        let headers = Signer::generate_public_headers(true);
+        let sim_header = headers
+            .iter()
+            .find(|(k, _)| *k == "x-simulated-trading")
+            .expect("simulated=true 时必须包含 x-simulated-trading");
+        assert_eq!(sim_header.1, "1");
     }
 
     #[test]

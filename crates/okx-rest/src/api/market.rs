@@ -33,6 +33,12 @@ pub mod endpoints {
     pub const TRADES: &str = "/api/v5/market/trades";
     /// Get trades history
     pub const TRADES_HISTORY: &str = "/api/v5/market/history-trades";
+    /// Get platform 24H total volume
+    pub const PLATFORM_24_VOLUME: &str = "/api/v5/market/platform-24-volume";
+    /// Get index components
+    pub const INDEX_COMPONENTS: &str = "/api/v5/market/index-components";
+    /// Get exchange rate
+    pub const EXCHANGE_RATE: &str = "/api/v5/market/exchange-rate";
     /// Get index tickers
     pub const INDEX_TICKERS: &str = "/api/v5/market/index-tickers";
     /// Get lite order book
@@ -166,6 +172,13 @@ pub struct GetOptionFamilyTradesParams {
     pub inst_family: String,
 }
 
+/// Query parameters for index components.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetIndexComponentsParams {
+    pub index: String,
+}
+
 /// Market Data API trait for OKX REST client.
 ///
 /// Provides methods for retrieving market data.
@@ -241,6 +254,19 @@ pub trait MarketApi {
         inst_id: &str,
         limit: Option<u32>,
     ) -> impl std::future::Future<Output = Result<Vec<Trade>>> + Send;
+
+    /// Get platform 24H total volume.
+    fn get_platform_24_volume(&self)
+        -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get index components.
+    fn get_index_components(
+        &self,
+        params: GetIndexComponentsParams,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+
+    /// Get exchange rate.
+    fn get_exchange_rate(&self) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
 
     /// Get index tickers.
     ///
@@ -339,6 +365,20 @@ impl MarketApi for OkxRestClient {
             limit: limit.map(|l| l.to_string()),
         };
         self.get_public(endpoints::TRADES, Some(&params)).await
+    }
+
+    async fn get_platform_24_volume(&self) -> Result<Vec<Value>> {
+        self.get_public(endpoints::PLATFORM_24_VOLUME, None::<&()>)
+            .await
+    }
+
+    async fn get_index_components(&self, params: GetIndexComponentsParams) -> Result<Vec<Value>> {
+        self.get_public(endpoints::INDEX_COMPONENTS, Some(&params))
+            .await
+    }
+
+    async fn get_exchange_rate(&self) -> Result<Vec<Value>> {
+        self.get_public(endpoints::EXCHANGE_RATE, None::<&()>).await
     }
 
     async fn get_index_tickers(&self, params: GetIndexTickersParams) -> Result<Vec<IndexTicker>> {
