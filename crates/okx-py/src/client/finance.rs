@@ -84,7 +84,10 @@ impl PyOkxClient {
 
     /// Flexible Loan：获取可作为抵押物的币种列表。
     #[pyo3(signature = (params_json=None))]
-    fn flexible_loan_collateral_assets(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+    fn flexible_loan_collateral_assets(
+        &self,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
         finance_impl::sync::flexible_loan_collateral_assets(self, params_json)
     }
 
@@ -120,7 +123,10 @@ impl PyOkxClient {
 
     /// Flexible Loan：查询计息明细。
     #[pyo3(signature = (params_json=None))]
-    fn flexible_loan_interest_accrued(&self, params_json: Option<&str>) -> PyResult<Vec<Py<PyAny>>> {
+    fn flexible_loan_interest_accrued(
+        &self,
+        params_json: Option<&str>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
         finance_impl::sync::flexible_loan_interest_accrued(self, params_json)
     }
 

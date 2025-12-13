@@ -394,7 +394,8 @@ impl FinanceApi for OkxRestClient {
     }
 
     async fn flexible_loan_loan_info(&self) -> Result<Vec<Value>> {
-        self.get(endpoints::FLEXIBLE_LOAN_LOAN_INFO, None::<&()>).await
+        self.get(endpoints::FLEXIBLE_LOAN_LOAN_INFO, None::<&()>)
+            .await
     }
 
     async fn flexible_loan_loan_history(&self, params: Option<Value>) -> Result<Vec<Value>> {
@@ -419,7 +420,8 @@ impl FinanceApi for OkxRestClient {
     }
 
     async fn staking_defi_eth_redeem(&self, request: Value) -> Result<Vec<Value>> {
-        self.post(endpoints::STAKING_DEFI_ETH_REDEEM, &request).await
+        self.post(endpoints::STAKING_DEFI_ETH_REDEEM, &request)
+            .await
     }
 
     async fn staking_defi_eth_balance(&self) -> Result<Vec<Value>> {
@@ -455,7 +457,8 @@ impl FinanceApi for OkxRestClient {
     }
 
     async fn staking_defi_sol_redeem(&self, request: Value) -> Result<Vec<Value>> {
-        self.post(endpoints::STAKING_DEFI_SOL_REDEEM, &request).await
+        self.post(endpoints::STAKING_DEFI_SOL_REDEEM, &request)
+            .await
     }
 
     async fn staking_defi_sol_balance(&self) -> Result<Vec<Value>> {

@@ -515,7 +515,8 @@ impl PublicApi for OkxRestClient {
             params.inst_family = None;
         }
 
-        self.get_public(endpoints::OPTION_TRADES, Some(&params)).await
+        self.get_public(endpoints::OPTION_TRADES, Some(&params))
+            .await
     }
 
     async fn get_delivery_exercise_history(

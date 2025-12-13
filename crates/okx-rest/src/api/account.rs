@@ -1179,7 +1179,9 @@ pub trait AccountApi {
     ///
     /// - Endpoint: GET /api/v5/account/risk-state
     /// - Permission: Read
-    fn get_account_risk_state(&self) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+    fn get_account_risk_state(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
 
     /// Get historical positions (up to 3 months).
     fn get_positions_history(

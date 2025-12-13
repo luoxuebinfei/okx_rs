@@ -40,4 +40,3 @@ impl PyAsyncOkxClient {
         raw_impl::async_api::post_private_raw(self, py, path, body_json)
     }
 }
-

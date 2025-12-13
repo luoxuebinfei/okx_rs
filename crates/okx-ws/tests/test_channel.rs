@@ -243,3 +243,94 @@ fn test_advanced_algo_channel_names() {
     assert!(recurring.is_private());
     assert_eq!(recurring.name(), "algo-recurring-buy");
 }
+
+#[test]
+fn test_remaining_channel_variants_names_and_privacy() {
+    let cases = vec![
+        (
+            Channel::Books {
+                inst_id: "BTC-USDT".into(),
+            },
+            "books",
+            false,
+        ),
+        (
+            Channel::Trades {
+                inst_id: "BTC-USDT".into(),
+            },
+            "trades",
+            false,
+        ),
+        (
+            Channel::Positions {
+                inst_type: "SWAP".into(),
+                inst_family: Some("BTC-USD".into()),
+                inst_id: Some("BTC-USD-SWAP".into()),
+            },
+            "positions",
+            true,
+        ),
+        (
+            Channel::Quotes {
+                inst_family: Some("BTC-USD".into()),
+            },
+            "quotes",
+            true,
+        ),
+        (
+            Channel::StrucBlockTrades {
+                inst_family: Some("BTC-USD".into()),
+            },
+            "struc-block-trades",
+            true,
+        ),
+        (
+            Channel::PublicStrucBlockTrades {
+                inst_family: Some("BTC-USD".into()),
+            },
+            "public-struc-block-trades",
+            false,
+        ),
+        (
+            Channel::GridOrdersContract {
+                algo_id: Some("1".into()),
+                inst_id: Some("BTC-USD-SWAP".into()),
+            },
+            "grid-orders-contract",
+            true,
+        ),
+        (
+            Channel::GridOrdersMoon {
+                algo_id: Some("1".into()),
+                inst_id: Some("BTC-USD-SWAP".into()),
+            },
+            "grid-orders-moon",
+            true,
+        ),
+        (
+            Channel::GridPositions {
+                algo_id: Some("1".into()),
+                inst_type: Some("SWAP".into()),
+                inst_id: Some("BTC-USD-SWAP".into()),
+            },
+            "grid-positions",
+            true,
+        ),
+        (
+            Channel::GridSubOrders {
+                algo_id: Some("1".into()),
+                inst_id: Some("BTC-USD-SWAP".into()),
+            },
+            "grid-sub-orders",
+            true,
+        ),
+    ];
+
+    for (channel, expected_name, expected_private) in cases {
+        assert_eq!(channel.name(), expected_name);
+        assert_eq!(channel.is_private(), expected_private);
+
+        let v = serde_json::to_value(&channel).expect("序列化应成功");
+        assert_eq!(v["channel"], expected_name);
+    }
+}

@@ -126,10 +126,7 @@ impl PyAsyncOkxClient {
     }
 
     /// Flexible Loan：获取可借币种列表（异步）。
-    fn flexible_loan_borrow_currencies<'py>(
-        &self,
-        py: Python<'py>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn flexible_loan_borrow_currencies<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         finance_impl::async_api::flexible_loan_borrow_currencies(self, py)
     }
 
@@ -197,10 +194,7 @@ impl PyAsyncOkxClient {
     }
 
     /// Staking-Defi（ETH）：获取产品信息（异步）。
-    fn staking_defi_eth_product_info<'py>(
-        &self,
-        py: Python<'py>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn staking_defi_eth_product_info<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         finance_impl::async_api::staking_defi_eth_product_info(self, py)
     }
 
@@ -247,10 +241,7 @@ impl PyAsyncOkxClient {
     }
 
     /// Staking-Defi（SOL）：获取产品信息（异步）。
-    fn staking_defi_sol_product_info<'py>(
-        &self,
-        py: Python<'py>,
-    ) -> PyResult<Bound<'py, PyAny>> {
+    fn staking_defi_sol_product_info<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         finance_impl::async_api::staking_defi_sol_product_info(self, py)
     }
 

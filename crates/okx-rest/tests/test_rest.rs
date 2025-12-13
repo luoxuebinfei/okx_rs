@@ -146,6 +146,266 @@ mod public_api_tests {
             eprintln!("Network error (acceptable): {}", e);
         }
     }
+
+    #[tokio::test]
+    async fn test_get_instrument_tick_bands() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetInstrumentTickBandsParams {
+            inst_type: "OPTION".to_string(),
+            inst_family: None,
+        };
+
+        match client.get_instrument_tick_bands(params).await {
+            Ok(bands) => {
+                if let Some(band) = bands.first() {
+                    if let Some(inst_id) = band.get("instId").and_then(|v| v.as_str()) {
+                        assert!(!inst_id.is_empty());
+                    }
+                }
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_option_trades() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetOptionTradesParams {
+            inst_id: None,
+            inst_family: Some("BTC-USD".to_string()),
+            opt_type: None,
+        };
+
+        match client.get_option_trades(params).await {
+            Ok(_trades) => {
+                // 期权交易数据可能为空
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_delivery_exercise_history() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetDeliveryExerciseHistoryParams {
+            inst_type: "FUTURES".to_string(),
+            uly: Some("BTC-USD".to_string()),
+            inst_family: None,
+            after: None,
+            before: None,
+            limit: Some("10".to_string()),
+        };
+
+        match client.get_delivery_exercise_history(params).await {
+            Ok(_history) => {
+                // 交割历史数据可能为空
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_open_interest() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetOpenInterestParams {
+            inst_type: "SWAP".to_string(),
+            uly: None,
+            inst_id: Some("BTC-USD-SWAP".to_string()),
+            inst_family: None,
+        };
+
+        match client.get_open_interest(params).await {
+            Ok(interests) => {
+                if let Some(oi) = interests.first() {
+                    if let Some(inst_id) = oi.get("instId").and_then(|v| v.as_str()) {
+                        assert_eq!(inst_id, "BTC-USD-SWAP");
+                    }
+                }
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_position_tiers() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetPositionTiersParams {
+            inst_type: "SWAP".to_string(),
+            td_mode: "cross".to_string(),
+            uly: None,
+            inst_id: Some("BTC-USD-SWAP".to_string()),
+            ccy: None,
+            tier: None,
+            inst_family: None,
+        };
+
+        match client.get_position_tiers(params).await {
+            Ok(_tiers) => {
+                // 仓位档位数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_price_limit() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetPriceLimitParams {
+            inst_id: "BTC-USD-SWAP".to_string(),
+        };
+
+        match client.get_price_limit(params).await {
+            Ok(limits) => {
+                if let Some(limit) = limits.first() {
+                    if let Some(inst_id) = limit.get("instId").and_then(|v| v.as_str()) {
+                        assert_eq!(inst_id, "BTC-USD-SWAP");
+                    }
+                }
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_opt_summary() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetOptSummaryParams {
+            uly: Some("BTC-USD".to_string()),
+            exp_time: None,
+            inst_family: None,
+        };
+
+        match client.get_opt_summary(params).await {
+            Ok(_summary) => {
+                // 期权概览数据可能为空
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_estimated_price() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetEstimatedPriceParams {
+            inst_id: "BTC-USD-SWAP".to_string(),
+        };
+
+        match client.get_estimated_price(params).await {
+            Ok(prices) => {
+                if let Some(price) = prices.first() {
+                    if let Some(inst_id) = price.get("instId").and_then(|v| v.as_str()) {
+                        assert_eq!(inst_id, "BTC-USD-SWAP");
+                    }
+                }
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_discount_interest_free_quota() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetDiscountQuotaParams { ccy: None };
+
+        match client.get_discount_interest_free_quota(params).await {
+            Ok(_quotas) => {
+                // 免息额度数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_interest_rate_loan_quota() {
+        let client = create_test_client();
+
+        match client.get_interest_rate_loan_quota().await {
+            Ok(_quotas) => {
+                // 利率贷款额度数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_vip_interest_rate_loan_quota() {
+        let client = create_test_client();
+
+        match client.get_vip_interest_rate_loan_quota().await {
+            Ok(_quotas) => {
+                // VIP 利率贷款额度数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_underlying() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetUnderlyingParams {
+            inst_type: Some("SWAP".to_string()),
+        };
+
+        match client.get_underlying(params).await {
+            Ok(underlyings) => {
+                assert!(!underlyings.is_empty());
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_insurance_fund() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetInsuranceFundParams {
+            inst_type: Some("SWAP".to_string()),
+            r#type: None,
+            uly: None,
+            ccy: None,
+            before: None,
+            after: None,
+            limit: Some("10".to_string()),
+            inst_family: None,
+        };
+
+        match client.get_insurance_fund(params).await {
+            Ok(_funds) => {
+                // 保险基金数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_convert_contract_coin() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::public::GetConvertContractCoinParams {
+            r#type: Some("1".to_string()),
+            inst_id: Some("BTC-USD-SWAP".to_string()),
+            sz: Some("1".to_string()),
+            px: None,
+            unit: None,
+        };
+
+        match client.get_convert_contract_coin(params).await {
+            Ok(_result) => {
+                // 合约币转换结果
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
 }
 
 mod market_api_tests {
@@ -268,6 +528,196 @@ mod market_api_tests {
                 if let Some(t) = tickers.first() {
                     assert_eq!(t.inst_id, "BTC-USD");
                 }
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_platform_24_volume() {
+        let client = create_test_client();
+
+        match client.get_platform_24_volume().await {
+            Ok(volumes) => {
+                assert!(!volumes.is_empty());
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_index_components() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::market::GetIndexComponentsParams {
+            index: "BTC-USD".to_string(),
+        };
+
+        match client.get_index_components(params).await {
+            Ok(_components) => {
+                // 指数成分数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_exchange_rate() {
+        let client = create_test_client();
+
+        match client.get_exchange_rate().await {
+            Ok(rates) => {
+                assert!(!rates.is_empty());
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_history_candles() {
+        use okx_rest::api::market::GetCandlesParams;
+
+        let client = create_test_client();
+
+        let params = GetCandlesParams {
+            inst_id: "BTC-USDT".to_string(),
+            bar: Some("1D".to_string()),
+            after: None,
+            before: None,
+            limit: Some("10".to_string()),
+        };
+
+        match client.get_history_candles(params).await {
+            Ok(candles) => {
+                assert!(!candles.is_empty());
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_index_candles() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::market::GetCandlesParams {
+            inst_id: "BTC-USD".to_string(),
+            bar: Some("1H".to_string()),
+            after: None,
+            before: None,
+            limit: Some("10".to_string()),
+        };
+
+        match client.get_index_candles(params).await {
+            Ok(_candles) => {
+                // 指数K线数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_mark_price_candles() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::market::GetCandlesParams {
+            inst_id: "BTC-USD-SWAP".to_string(),
+            bar: Some("1H".to_string()),
+            after: None,
+            before: None,
+            limit: Some("10".to_string()),
+        };
+
+        match client.get_mark_price_candles(params).await {
+            Ok(_candles) => {
+                // 标记价格K线数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_history_trades() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::market::GetHistoryTradesParams {
+            inst_id: "BTC-USDT".to_string(),
+            after: None,
+            before: None,
+            limit: Some("10".to_string()),
+            r#type: None,
+        };
+
+        match client.get_history_trades(params).await {
+            Ok(_trades) => {
+                // 历史交易数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_orderbook_lite() {
+        let client = create_test_client();
+
+        match client.get_orderbook_lite("BTC-USDT").await {
+            Ok(books) => {
+                if let Some(book) = books.first() {
+                    assert!(book.ts.parse::<u64>().is_ok());
+                }
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_block_ticker() {
+        let client = create_test_client();
+
+        match client.get_block_ticker("BTC-USDT").await {
+            Ok(_tickers) => {
+                // 大宗交易ticker数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_block_tickers() {
+        let client = create_test_client();
+
+        let params = okx_rest::api::market::GetBlockTickersParams {
+            inst_type: "SPOT".to_string(),
+            uly: None,
+            inst_family: None,
+        };
+
+        match client.get_block_tickers(params).await {
+            Ok(_tickers) => {
+                // 大宗交易tickers数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_block_trades() {
+        let client = create_test_client();
+
+        match client.get_block_trades("BTC-USDT").await {
+            Ok(_trades) => {
+                // 大宗交易数据
+            }
+            Err(e) => eprintln!("Network error (acceptable): {}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_option_family_trades() {
+        let client = create_test_client();
+
+        match client.get_option_family_trades("BTC-USD").await {
+            Ok(_trades) => {
+                // 期权家族交易数据
             }
             Err(e) => eprintln!("Network error (acceptable): {}", e),
         }

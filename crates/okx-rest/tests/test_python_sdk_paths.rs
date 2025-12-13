@@ -86,7 +86,10 @@ fn account_endpoints_match_official_sdk() {
             account::endpoints::SET_AUTO_LOAN,
             "/api/v5/account/set-auto-loan",
         ),
-        (account::endpoints::INSTRUMENTS, "/api/v5/account/instruments"),
+        (
+            account::endpoints::INSTRUMENTS,
+            "/api/v5/account/instruments",
+        ),
         (account::endpoints::RISK_STATE, "/api/v5/account/risk-state"),
     ];
 
@@ -752,7 +755,10 @@ fn public_endpoints_match_official_sdk() {
             public::endpoints::INSTRUMENT_TICK_BANDS,
             "/api/v5/public/instrument-tick-bands",
         ),
-        (public::endpoints::OPTION_TRADES, "/api/v5/public/option-trades"),
+        (
+            public::endpoints::OPTION_TRADES,
+            "/api/v5/public/option-trades",
+        ),
     ];
 
     for (actual, expected) in cases {

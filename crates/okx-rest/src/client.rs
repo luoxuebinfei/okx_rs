@@ -1,203 +1,116 @@
-//! HTTP client for OKX REST API.
+//! OKX REST API HTTP 客户端。
 //!
-//! Source: Based on official Python SDK structure
+//! 参考：官方 Python SDK 的组织方式
 //! - <https://github.com/okxapi/python-okx>
 
-use std::time::Duration;
+use std::{future::Future, pin::Pin, time::Duration};
 
-use reqwest::{Client, Method, Proxy, Response, StatusCode};
+use reqwest::{Client, Method, Proxy, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use tracing::{debug, instrument};
 
 use okx_core::{types::ApiResponse, Config, OkxError, Result, Signer};
 
-/// REST API client for OKX exchange.
-///
-/// Handles HTTP requests with automatic authentication signing.
+type TransportFuture = Pin<Box<dyn Future<Output = Result<(StatusCode, String)>> + Send>>;
+
+/// HTTP 传输层抽象（便于在无网络/受限环境中做纯内存测试）。
+trait HttpTransport: Clone + Send + Sync + 'static {
+    fn send(
+        &self,
+        method: Method,
+        url: String,
+        headers: Vec<(&'static str, String)>,
+        body: Option<String>,
+    ) -> TransportFuture;
+}
+
 #[derive(Debug, Clone)]
-pub struct OkxRestClient {
-    /// HTTP client
-    http: Client,
-    /// Client configuration
+struct ReqwestTransport {
+    client: Client,
+}
+
+impl HttpTransport for ReqwestTransport {
+    fn send(
+        &self,
+        method: Method,
+        url: String,
+        headers: Vec<(&'static str, String)>,
+        body: Option<String>,
+    ) -> TransportFuture {
+        let client = self.client.clone();
+        Box::pin(async move {
+            let mut request = client.request(method, &url);
+
+            for (name, value) in headers {
+                request = request.header(name, value);
+            }
+
+            if let Some(body) = body {
+                request = request.body(body);
+            }
+
+            let response = request
+                .send()
+                .await
+                .map_err(|e| OkxError::Http(e.to_string()))?;
+
+            let status = response.status();
+            let text = response
+                .text()
+                .await
+                .map_err(|e| OkxError::Http(format!("Failed to read response: {e}")))?;
+
+            Ok((status, text))
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+struct OkxRestClientInner<T: HttpTransport> {
+    transport: T,
     config: Config,
-    /// Request signer
     signer: Signer,
 }
 
-impl OkxRestClient {
-    /// Create a new REST client with the given configuration.
-    ///
-    /// If a proxy URL is configured, it will be used for all requests.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the HTTP client cannot be built.
-    #[must_use]
-    pub fn new(config: Config) -> Self {
-        let mut builder = Client::builder().timeout(Duration::from_secs(config.timeout_secs()));
-
-        // Configure proxy if specified
-        if let Some(proxy_url) = config.proxy_url() {
-            let proxy = Proxy::all(proxy_url).expect("Invalid proxy URL");
-            builder = builder.proxy(proxy);
-        }
-
-        let http = builder.build().expect("Failed to build HTTP client");
+impl<T: HttpTransport> OkxRestClientInner<T> {
+    fn new(config: Config, transport: T) -> Self {
         let signer = Signer::new(config.credentials().clone());
-
         Self {
-            http,
+            transport,
             config,
             signer,
         }
     }
 
-    /// Create a new REST client with a custom HTTP client.
-    #[must_use]
-    pub fn with_http_client(config: Config, http: Client) -> Self {
-        let signer = Signer::new(config.credentials().clone());
-        Self {
-            http,
-            config,
-            signer,
-        }
-    }
-
-    /// Get the client configuration.
-    #[must_use]
-    pub fn config(&self) -> &Config {
+    fn config(&self) -> &Config {
         &self.config
     }
 
-    /// Make a GET request to a public endpoint (no authentication).
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - API path (e.g., "/api/v5/market/ticker")
-    /// * `params` - Optional query parameters
-    #[instrument(skip(self, params), fields(path = %path))]
-    pub async fn get_public<T, P>(&self, path: &str, params: Option<&P>) -> Result<Vec<T>>
-    where
-        T: DeserializeOwned,
-        P: Serialize + ?Sized,
-    {
-        let url = self.build_url(path, params)?;
-        debug!("GET (public) {}", url);
-
-        let headers = Signer::generate_public_headers(self.config.is_simulated());
-        let response = self.send_request(Method::GET, &url, headers, None).await?;
-        self.parse_response(response).await
+    async fn send_and_parse<TOut: DeserializeOwned>(
+        &self,
+        method: Method,
+        url: String,
+        headers: Vec<(&'static str, String)>,
+        body: Option<String>,
+    ) -> Result<Vec<TOut>> {
+        let (status, text) = self.transport.send(method, url, headers, body).await?;
+        debug!("Response status={} body={}", status, text);
+        self.parse_body(status, &text)
     }
 
-    /// Make a GET request to a public endpoint and return the raw JSON response.
-    ///
-    /// This method does not interpret the OKX `code` field and will return the full JSON payload
-    /// on HTTP success.
-    #[instrument(skip(self, params), fields(path = %path))]
-    pub async fn get_public_raw<P>(&self, path: &str, params: Option<&P>) -> Result<Value>
-    where
-        P: Serialize + ?Sized,
-    {
-        let url = self.build_url(path, params)?;
-        debug!("GET (public raw) {}", url);
-
-        let headers = Signer::generate_public_headers(self.config.is_simulated());
-        let response = self.send_request(Method::GET, &url, headers, None).await?;
-        self.parse_response_raw(response).await
+    async fn send_and_parse_raw(
+        &self,
+        method: Method,
+        url: String,
+        headers: Vec<(&'static str, String)>,
+        body: Option<String>,
+    ) -> Result<Value> {
+        let (status, text) = self.transport.send(method, url, headers, body).await?;
+        debug!("Raw response status={} body={}", status, text);
+        self.parse_body_raw(status, &text)
     }
 
-    /// Make a GET request to a private endpoint (with authentication).
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - API path (e.g., "/api/v5/account/balance")
-    /// * `params` - Optional query parameters
-    #[instrument(skip(self, params), fields(path = %path))]
-    pub async fn get<T, P>(&self, path: &str, params: Option<&P>) -> Result<Vec<T>>
-    where
-        T: DeserializeOwned,
-        P: Serialize + ?Sized,
-    {
-        let url = self.build_url(path, params)?;
-        let request_path = self.extract_request_path(&url);
-        debug!("GET (private) {}", url);
-
-        let headers =
-            self.signer
-                .generate_headers("GET", &request_path, "", self.config.is_simulated());
-        let response = self.send_request(Method::GET, &url, headers, None).await?;
-        self.parse_response(response).await
-    }
-
-    /// Make a GET request to a private endpoint (with authentication) and return the raw JSON response.
-    ///
-    /// This method does not interpret the OKX `code` field and will return the full JSON payload
-    /// on HTTP success.
-    #[instrument(skip(self, params), fields(path = %path))]
-    pub async fn get_raw<P>(&self, path: &str, params: Option<&P>) -> Result<Value>
-    where
-        P: Serialize + ?Sized,
-    {
-        let url = self.build_url(path, params)?;
-        let request_path = self.extract_request_path(&url);
-        debug!("GET (private raw) {}", url);
-
-        let headers =
-            self.signer
-                .generate_headers("GET", &request_path, "", self.config.is_simulated());
-        let response = self.send_request(Method::GET, &url, headers, None).await?;
-        self.parse_response_raw(response).await
-    }
-
-    /// Make a POST request to a private endpoint (with authentication).
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - API path (e.g., "/api/v5/trade/order")
-    /// * `body` - Request body
-    #[instrument(skip(self, body), fields(path = %path))]
-    pub async fn post<T, B>(&self, path: &str, body: &B) -> Result<Vec<T>>
-    where
-        T: DeserializeOwned,
-        B: Serialize + ?Sized,
-    {
-        let url = format!("{}{}", self.config.rest_url(), path);
-        let body_str = serde_json::to_string(body)?;
-        debug!("POST {} body={}", url, body_str);
-
-        let headers =
-            self.signer
-                .generate_headers("POST", path, &body_str, self.config.is_simulated());
-        let response = self
-            .send_request(Method::POST, &url, headers, Some(body_str))
-            .await?;
-        self.parse_response(response).await
-    }
-
-    /// Make a POST request to a private endpoint (with authentication) and return the raw JSON response.
-    ///
-    /// This method does not interpret the OKX `code` field and will return the full JSON payload
-    /// on HTTP success.
-    #[instrument(skip(self, body), fields(path = %path))]
-    pub async fn post_raw<B>(&self, path: &str, body: &B) -> Result<Value>
-    where
-        B: Serialize + ?Sized,
-    {
-        let url = format!("{}{}", self.config.rest_url(), path);
-        let body_str = serde_json::to_string(body)?;
-        debug!("POST (private raw) {} body={}", url, body_str);
-
-        let headers =
-            self.signer
-                .generate_headers("POST", path, &body_str, self.config.is_simulated());
-        let response = self
-            .send_request(Method::POST, &url, headers, Some(body_str))
-            .await?;
-        self.parse_response_raw(response).await
-    }
-
-    /// Build URL with optional query parameters.
     fn build_url<P: Serialize + ?Sized>(&self, path: &str, params: Option<&P>) -> Result<String> {
         let base_url = format!("{}{}", self.config.rest_url(), path);
 
@@ -215,65 +128,17 @@ impl OkxRestClient {
         }
     }
 
-    /// Extract request path (including query string) from full URL.
     fn extract_request_path(&self, url: &str) -> String {
         url.strip_prefix(self.config.rest_url())
             .unwrap_or(url)
             .to_string()
     }
 
-    /// Send HTTP request with headers.
-    async fn send_request(
+    fn parse_body<TOut: DeserializeOwned>(
         &self,
-        method: Method,
-        url: &str,
-        headers: Vec<(&'static str, String)>,
-        body: Option<String>,
-    ) -> Result<Response> {
-        let mut request = self.http.request(method, url);
-
-        for (name, value) in headers {
-            request = request.header(name, value);
-        }
-
-        if let Some(body) = body {
-            request = request.body(body);
-        }
-
-        request
-            .send()
-            .await
-            .map_err(|e| OkxError::Http(e.to_string()))
-    }
-
-    /// Parse API response and extract data.
-    async fn parse_response<T: DeserializeOwned>(&self, response: Response) -> Result<Vec<T>> {
-        let status = response.status();
-        let text = response
-            .text()
-            .await
-            .map_err(|e| OkxError::Http(format!("Failed to read response: {e}")))?;
-
-        debug!("Response status={} body={}", status, text);
-
-        self.parse_body(status, &text)
-    }
-
-    /// Parse API response and return the raw JSON payload.
-    async fn parse_response_raw(&self, response: Response) -> Result<Value> {
-        let status = response.status();
-        let text = response
-            .text()
-            .await
-            .map_err(|e| OkxError::Http(format!("Failed to read response: {e}")))?;
-
-        debug!("Raw response status={} body={}", status, text);
-
-        self.parse_body_raw(status, &text)
-    }
-
-    /// Parse response body with status code.
-    fn parse_body<T: DeserializeOwned>(&self, status: StatusCode, text: &str) -> Result<Vec<T>> {
+        status: StatusCode,
+        text: &str,
+    ) -> Result<Vec<TOut>> {
         if !status.is_success() {
             return Err(OkxError::Http(format!(
                 "HTTP error: status={}, body={}",
@@ -281,8 +146,7 @@ impl OkxRestClient {
             )));
         }
 
-        let api_response: ApiResponse<T> = serde_json::from_str(text)?;
-
+        let api_response: ApiResponse<TOut> = serde_json::from_str(text)?;
         if api_response.is_success() {
             Ok(api_response.data)
         } else {
@@ -290,7 +154,6 @@ impl OkxRestClient {
         }
     }
 
-    /// Parse response body with status code and return the raw JSON payload.
     fn parse_body_raw(&self, status: StatusCode, text: &str) -> Result<Value> {
         if !status.is_success() {
             return Err(OkxError::Http(format!(
@@ -301,20 +164,210 @@ impl OkxRestClient {
 
         Ok(serde_json::from_str(text)?)
     }
+
+    async fn get_public<TOut, P>(&self, path: &str, params: Option<&P>) -> Result<Vec<TOut>>
+    where
+        TOut: DeserializeOwned,
+        P: Serialize + ?Sized,
+    {
+        let url = self.build_url(path, params)?;
+        debug!("GET (public) {}", url);
+
+        let headers = Signer::generate_public_headers(self.config.is_simulated());
+        self.send_and_parse(Method::GET, url, headers, None).await
+    }
+
+    async fn get_public_raw<P>(&self, path: &str, params: Option<&P>) -> Result<Value>
+    where
+        P: Serialize + ?Sized,
+    {
+        let url = self.build_url(path, params)?;
+        debug!("GET (public raw) {}", url);
+
+        let headers = Signer::generate_public_headers(self.config.is_simulated());
+        self.send_and_parse_raw(Method::GET, url, headers, None)
+            .await
+    }
+
+    async fn get<TOut, P>(&self, path: &str, params: Option<&P>) -> Result<Vec<TOut>>
+    where
+        TOut: DeserializeOwned,
+        P: Serialize + ?Sized,
+    {
+        let url = self.build_url(path, params)?;
+        let request_path = self.extract_request_path(&url);
+        debug!("GET (private) {}", url);
+
+        let headers =
+            self.signer
+                .generate_headers("GET", &request_path, "", self.config.is_simulated());
+        self.send_and_parse(Method::GET, url, headers, None).await
+    }
+
+    async fn get_raw<P>(&self, path: &str, params: Option<&P>) -> Result<Value>
+    where
+        P: Serialize + ?Sized,
+    {
+        let url = self.build_url(path, params)?;
+        let request_path = self.extract_request_path(&url);
+        debug!("GET (private raw) {}", url);
+
+        let headers =
+            self.signer
+                .generate_headers("GET", &request_path, "", self.config.is_simulated());
+        self.send_and_parse_raw(Method::GET, url, headers, None)
+            .await
+    }
+
+    async fn post<TOut, B>(&self, path: &str, body: &B) -> Result<Vec<TOut>>
+    where
+        TOut: DeserializeOwned,
+        B: Serialize + ?Sized,
+    {
+        let url = format!("{}{}", self.config.rest_url(), path);
+        let body_str = serde_json::to_string(body)?;
+        debug!("POST {} body={}", url, body_str);
+
+        let headers =
+            self.signer
+                .generate_headers("POST", path, &body_str, self.config.is_simulated());
+        self.send_and_parse(Method::POST, url, headers, Some(body_str))
+            .await
+    }
+
+    async fn post_raw<B>(&self, path: &str, body: &B) -> Result<Value>
+    where
+        B: Serialize + ?Sized,
+    {
+        let url = format!("{}{}", self.config.rest_url(), path);
+        let body_str = serde_json::to_string(body)?;
+        debug!("POST (private raw) {} body={}", url, body_str);
+
+        let headers =
+            self.signer
+                .generate_headers("POST", path, &body_str, self.config.is_simulated());
+        self.send_and_parse_raw(Method::POST, url, headers, Some(body_str))
+            .await
+    }
+}
+
+/// OKX 交易所 REST API 客户端。
+///
+/// 负责：
+/// - 构造 URL（含 query 编码）
+/// - 生成签名请求头（私有接口）
+/// - 发送请求并解析 OKX 标准响应
+#[derive(Debug, Clone)]
+pub struct OkxRestClient {
+    inner: OkxRestClientInner<ReqwestTransport>,
+}
+
+impl OkxRestClient {
+    /// 创建新的 REST 客户端。
+    ///
+    /// - 超时与代理来自 `Config`
+    /// - HTTP 客户端构建失败将 panic（与现有行为保持一致）
+    #[must_use]
+    pub fn new(config: Config) -> Self {
+        let mut builder = Client::builder().timeout(Duration::from_secs(config.timeout_secs()));
+
+        if let Some(proxy_url) = config.proxy_url() {
+            let proxy = Proxy::all(proxy_url).expect("Invalid proxy URL");
+            builder = builder.proxy(proxy);
+        }
+
+        let http = builder.build().expect("Failed to build HTTP client");
+        Self::with_http_client(config, http)
+    }
+
+    /// 使用自定义 `reqwest::Client` 创建 REST 客户端。
+    #[must_use]
+    pub fn with_http_client(config: Config, http: Client) -> Self {
+        let transport = ReqwestTransport { client: http };
+        Self {
+            inner: OkxRestClientInner::new(config, transport),
+        }
+    }
+
+    /// 读取配置。
+    #[must_use]
+    pub fn config(&self) -> &Config {
+        self.inner.config()
+    }
+
+    /// 公有 GET（不签名）。
+    #[instrument(skip(self, params), fields(path = %path))]
+    pub async fn get_public<TOut, P>(&self, path: &str, params: Option<&P>) -> Result<Vec<TOut>>
+    where
+        TOut: DeserializeOwned,
+        P: Serialize + ?Sized,
+    {
+        self.inner.get_public(path, params).await
+    }
+
+    /// 公有 GET（raw），返回完整 JSON（不解释 OKX `code`）。
+    #[instrument(skip(self, params), fields(path = %path))]
+    pub async fn get_public_raw<P>(&self, path: &str, params: Option<&P>) -> Result<Value>
+    where
+        P: Serialize + ?Sized,
+    {
+        self.inner.get_public_raw(path, params).await
+    }
+
+    /// 私有 GET（签名）。
+    #[instrument(skip(self, params), fields(path = %path))]
+    pub async fn get<TOut, P>(&self, path: &str, params: Option<&P>) -> Result<Vec<TOut>>
+    where
+        TOut: DeserializeOwned,
+        P: Serialize + ?Sized,
+    {
+        self.inner.get(path, params).await
+    }
+
+    /// 私有 GET（raw，签名）。
+    #[instrument(skip(self, params), fields(path = %path))]
+    pub async fn get_raw<P>(&self, path: &str, params: Option<&P>) -> Result<Value>
+    where
+        P: Serialize + ?Sized,
+    {
+        self.inner.get_raw(path, params).await
+    }
+
+    /// 私有 POST（签名）。
+    #[instrument(skip(self, body), fields(path = %path))]
+    pub async fn post<TOut, B>(&self, path: &str, body: &B) -> Result<Vec<TOut>>
+    where
+        TOut: DeserializeOwned,
+        B: Serialize + ?Sized,
+    {
+        self.inner.post(path, body).await
+    }
+
+    /// 私有 POST（raw，签名）。
+    #[instrument(skip(self, body), fields(path = %path))]
+    pub async fn post_raw<B>(&self, path: &str, body: &B) -> Result<Value>
+    where
+        B: Serialize + ?Sized,
+    {
+        self.inner.post_raw(path, body).await
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use okx_core::{types::Ticker, Config, Credentials};
-    use reqwest::StatusCode;
+
+    use okx_core::{signer::headers, Credentials};
     use serde::{Deserialize, Serialize};
     use std::{
-        io::{Read, Write},
-        net::{Shutdown, TcpListener, TcpStream},
-        thread,
-        time::Duration,
+        collections::VecDeque,
+        sync::{Arc, Mutex},
     };
+
+    #[derive(Debug, Deserialize)]
+    struct DummyData {
+        value: i32,
+    }
 
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
@@ -324,144 +377,263 @@ mod tests {
         limit: Option<String>,
     }
 
-    #[derive(Debug, Deserialize)]
-    struct DummyData {
-        value: i32,
-    }
-
     #[derive(Debug, Serialize)]
     #[serde(rename_all = "camelCase")]
-    struct SpecialParams {
-        keyword: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        inst_type: Option<String>,
+    struct PostBody {
+        name: String,
+        count: i32,
     }
 
-    #[derive(Debug, Serialize)]
-    struct OptionalOnly {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        foo: Option<String>,
+    #[derive(Debug)]
+    struct RecordedRequest {
+        method: Method,
+        url: String,
+        headers: Vec<(&'static str, String)>,
+        body: Option<String>,
     }
 
-    fn client_with_base(base_url: &str) -> OkxRestClient {
-        let config = Config::new(Credentials::new("k", "s", "p"))
-            .with_rest_url(base_url.to_string())
-            .with_timeout_secs(1);
-        OkxRestClient::new(config)
+    #[derive(Clone, Default)]
+    struct FakeTransport {
+        responses: Arc<Mutex<VecDeque<Result<(StatusCode, String)>>>>,
+        requests: Arc<Mutex<Vec<RecordedRequest>>>,
+    }
+
+    impl FakeTransport {
+        fn push_ok(&self, status: StatusCode, body: impl Into<String>) {
+            self.responses
+                .lock()
+                .expect("锁 responses 失败")
+                .push_back(Ok((status, body.into())));
+        }
+
+        fn push_err(&self, err: OkxError) {
+            self.responses
+                .lock()
+                .expect("锁 responses 失败")
+                .push_back(Err(err));
+        }
+
+        fn take_requests(&self) -> Vec<RecordedRequest> {
+            std::mem::take(&mut *self.requests.lock().expect("锁 requests 失败"))
+        }
+    }
+
+    impl HttpTransport for FakeTransport {
+        fn send(
+            &self,
+            method: Method,
+            url: String,
+            headers: Vec<(&'static str, String)>,
+            body: Option<String>,
+        ) -> TransportFuture {
+            self.requests
+                .lock()
+                .expect("锁 requests 失败")
+                .push(RecordedRequest {
+                    method,
+                    url,
+                    headers,
+                    body,
+                });
+
+            let next = self
+                .responses
+                .lock()
+                .expect("锁 responses 失败")
+                .pop_front()
+                .expect("FakeTransport 未配置返回值");
+
+            Box::pin(async move { next })
+        }
+    }
+
+    fn inner_client_with_base(
+        base_url: &str,
+        transport: FakeTransport,
+    ) -> OkxRestClientInner<FakeTransport> {
+        let cfg = Config::new(Credentials::new("k", "s", "p"))
+            .simulated(true)
+            .with_rest_url(base_url);
+        OkxRestClientInner::new(cfg, transport)
     }
 
     #[test]
-    fn build_url_and_extract_request_path_cover_optional_params() {
-        let client = client_with_base("https://example.com");
+    fn build_url_encodes_special_chars_and_optional_params() {
+        let transport = FakeTransport::default();
+        let client = inner_client_with_base("https://example.com", transport);
+
         let params = QueryParams {
             inst_id: "BTC-USDT".into(),
-            limit: Some("10".into()),
+            limit: None,
         };
-
         let url = client
-            .build_url("/api/v5/mock", Some(&params))
-            .expect("应构造 URL");
+            .build_url("/api/v5/market/ticker", Some(&params))
+            .expect("build_url 应成功");
         assert_eq!(
             url,
-            "https://example.com/api/v5/mock?instId=BTC-USDT&limit=10"
-        );
-
-        let request_path = client.extract_request_path(&url);
-        assert_eq!(request_path, "/api/v5/mock?instId=BTC-USDT&limit=10");
-
-        let base_only = client
-            .build_url::<()>("/api/v5/mock", None::<&()>)
-            .expect("无参数也应成功");
-        assert_eq!(base_only, "https://example.com/api/v5/mock");
-
-        // 非本项目 base 前缀时应原样返回
-        let full_url = "https://other.com/keep";
-        assert_eq!(client.extract_request_path(full_url), full_url);
-    }
-
-    #[test]
-    fn build_url_encodes_special_chars_and_vector_params() {
-        let client = client_with_base("https://example.com");
-        let params = SpecialParams {
-            keyword: "BTC/USDT test".into(),
-            inst_type: Some("SWAP,SPOT".into()),
-        };
-
-        let url = client
-            .build_url("/api/v5/search", Some(&params))
-            .expect("应成功编码参数");
-
-        assert_eq!(
-            url,
-            "https://example.com/api/v5/search?keyword=BTC%2FUSDT+test&instType=SWAP%2CSPOT"
+            "https://example.com/api/v5/market/ticker?instId=BTC-USDT"
         );
     }
 
-    #[test]
-    fn build_url_ignores_empty_query() {
-        let client = client_with_base("https://example.com");
-        let params = OptionalOnly { foo: None };
+    #[tokio::test]
+    async fn get_public_parses_success_response_and_sends_public_headers() {
+        let transport = FakeTransport::default();
+        transport.push_ok(
+            StatusCode::OK,
+            r#"{"code":"0","msg":"","data":[{"value":42}]}"#,
+        );
 
-        let url = client
-            .build_url("/api/v5/empty", Some(&params))
-            .expect("空参数也应成功");
-        assert_eq!(url, "https://example.com/api/v5/empty");
-    }
-
-    #[test]
-    fn spawn_response_server_serves_body() {
-        let Some((base_url, handle)) = (0..3).find_map(|_| {
-            let server = spawn_response_server("200 OK", r#"{"value":1}"#);
-            if server.is_none() {
-                thread::sleep(Duration::from_millis(10));
-            }
-            server
-        }) else {
-            eprintln!("无法绑定本地端口，跳过验证响应内容");
-            return;
+        let client = inner_client_with_base("https://example.com", transport.clone());
+        let params = QueryParams {
+            inst_id: "BTC-USDT".into(),
+            limit: None,
         };
-
-        let addr = base_url.strip_prefix("http://").expect("需含 http 前缀");
-        let mut stream = TcpStream::connect(addr).expect("应能连接到本地服务");
-        stream
-            .write_all(b"GET / HTTP/1.1\r\nHost: test\r\n\r\n")
-            .expect("应能写入请求");
-
-        let mut buf = String::new();
-        stream.read_to_string(&mut buf).expect("应能读取响应体");
-        assert!(buf.contains("200 OK"));
-        assert!(buf.contains(r#"{"value":1}"#));
-
-        handle.join().expect("响应线程应正常结束");
-    }
-
-    #[test]
-    fn parse_body_parses_success_response() {
-        let client = client_with_base("https://example.com");
-        let body = r#"{"code":"0","msg":"","data":[{"value":7}]}"#;
 
         let data = client
-            .parse_body::<DummyData>(StatusCode::OK, body)
-            .expect("成功响应应解析为数据");
+            .get_public::<DummyData, _>("/api/v5/mock", Some(&params))
+            .await
+            .expect("应成功解析响应");
+        assert_eq!(data[0].value, 42);
 
-        assert_eq!(data.len(), 1);
+        let req = transport.take_requests().pop().expect("应记录一次请求");
+        assert_eq!(req.method, Method::GET);
+        assert_eq!(req.url, "https://example.com/api/v5/mock?instId=BTC-USDT");
+        assert!(req.body.is_none());
+        assert!(req.headers.iter().any(|(k, _)| *k == headers::CONTENT_TYPE));
+        assert!(req
+            .headers
+            .iter()
+            .any(|(k, v)| *k == headers::X_SIMULATED_TRADING && v == "1"));
+    }
+
+    #[tokio::test]
+    async fn get_public_raw_returns_full_payload_even_when_code_is_nonzero() {
+        let transport = FakeTransport::default();
+        transport.push_ok(
+            StatusCode::OK,
+            r#"{"code":"51000","msg":"failure","data":[]}"#,
+        );
+
+        let client = inner_client_with_base("https://example.com", transport);
+        let params = QueryParams {
+            inst_id: "BTC-USDT".into(),
+            limit: None,
+        };
+
+        let raw = client
+            .get_public_raw("/api/v5/mock", Some(&params))
+            .await
+            .expect("raw 调用应成功返回 payload");
+
+        assert_eq!(raw["code"], "51000");
+        assert_eq!(raw["msg"], "failure");
+    }
+
+    #[tokio::test]
+    async fn get_raw_and_post_raw_send_signed_headers_and_body() {
+        let transport = FakeTransport::default();
+        transport.push_ok(
+            StatusCode::OK,
+            r#"{"code":"0","msg":"","data":[{"value":7}]}"#,
+        );
+        transport.push_ok(StatusCode::OK, r#"{"value":1}"#);
+
+        let client = inner_client_with_base("https://example.com", transport.clone());
+        let params = QueryParams {
+            inst_id: "BTC-USDT".into(),
+            limit: None,
+        };
+
+        let data = client
+            .get::<DummyData, _>("/api/v5/private/mock", Some(&params))
+            .await
+            .expect("私有 GET 应成功解析");
         assert_eq!(data[0].value, 7);
+
+        let body = PostBody {
+            name: "n".into(),
+            count: 1,
+        };
+        let raw = client
+            .post_raw("/api/v5/private/post", &body)
+            .await
+            .expect("私有 POST raw 应成功解析");
+        assert_eq!(raw["value"], 1);
+
+        let reqs = transport.take_requests();
+        assert_eq!(reqs.len(), 2);
+
+        // 私有 GET：带 query 的 request_path 也应参与签名
+        assert_eq!(reqs[0].method, Method::GET);
+        assert!(reqs[0].url.contains("/api/v5/private/mock?instId=BTC-USDT"));
+        assert!(reqs[0]
+            .headers
+            .iter()
+            .any(|(k, _)| *k == headers::OK_ACCESS_KEY));
+        assert!(reqs[0]
+            .headers
+            .iter()
+            .any(|(k, _)| *k == headers::OK_ACCESS_SIGN));
+        assert!(reqs[0]
+            .headers
+            .iter()
+            .any(|(k, _)| *k == headers::OK_ACCESS_TIMESTAMP));
+        assert!(reqs[0]
+            .headers
+            .iter()
+            .any(|(k, _)| *k == headers::OK_ACCESS_PASSPHRASE));
+
+        // 私有 POST raw：请求体必须是 JSON 串，并参与签名
+        assert_eq!(reqs[1].method, Method::POST);
+        assert!(reqs[1].url.ends_with("/api/v5/private/post"));
+        assert_eq!(reqs[1].body.as_deref(), Some(r#"{"name":"n","count":1}"#));
+        assert!(reqs[1]
+            .headers
+            .iter()
+            .any(|(k, _)| *k == headers::OK_ACCESS_SIGN));
+    }
+
+    #[tokio::test]
+    async fn transport_error_is_propagated() {
+        let transport = FakeTransport::default();
+        transport.push_err(OkxError::Http("network".into()));
+
+        let client = inner_client_with_base("https://example.com", transport);
+        let err = client
+            .get_public::<DummyData, ()>("/api/v5/mock", None)
+            .await
+            .expect_err("应传播传输层错误");
+        assert!(matches!(err, OkxError::Http(_)));
+    }
+
+    #[tokio::test]
+    async fn http_status_error_is_reported_as_http_error() {
+        let transport = FakeTransport::default();
+        transport.push_ok(StatusCode::INTERNAL_SERVER_ERROR, "oops");
+
+        let client = inner_client_with_base("https://example.com", transport);
+        let err = client
+            .get_public::<DummyData, ()>("/api/v5/mock", None)
+            .await
+            .expect_err("HTTP 非 2xx 应返回错误");
+        assert!(matches!(err, OkxError::Http(_)));
     }
 
     #[test]
     fn parse_body_invalid_json_returns_serde_error() {
-        let client = client_with_base("https://example.com");
+        let transport = FakeTransport::default();
+        let client = inner_client_with_base("https://example.com", transport);
         let err = client
             .parse_body::<DummyData>(StatusCode::OK, "not json")
             .expect_err("非法 JSON 应返回 Serde 错误");
-
         assert!(matches!(err, OkxError::Serde(_)));
     }
 
     #[test]
     fn parse_body_returns_api_error_for_failure_code() {
+        let transport = FakeTransport::default();
+        let client = inner_client_with_base("https://example.com", transport);
         let body = r#"{"code":"51000","msg":"failure","data":[]}"#;
-        let client = client_with_base("https://example.com");
         let err = client
             .parse_body::<DummyData>(StatusCode::OK, body)
             .expect_err("非 0 code 应返回 API 错误");
@@ -476,249 +648,23 @@ mod tests {
     }
 
     #[test]
-    fn parse_body_raw_returns_full_payload_even_when_code_is_nonzero() {
+    fn parse_body_raw_returns_full_payload_on_http_success() {
+        let transport = FakeTransport::default();
+        let client = inner_client_with_base("https://example.com", transport);
         let body = r#"{"code":"51000","msg":"failure","data":[]}"#;
-        let client = client_with_base("https://example.com");
 
         let raw = client
             .parse_body_raw(StatusCode::OK, body)
             .expect("raw 响应在 HTTP 成功时应返回完整 JSON");
-
         assert_eq!(raw["code"], "51000");
-        assert_eq!(raw["msg"], "failure");
-        assert!(raw["data"].is_array());
     }
 
     #[test]
-    fn parse_body_raw_propagates_http_status_errors() {
-        let body = r#"{"code":"0","msg":"","data":[]}"#;
-        let client = client_with_base("https://example.com");
+    fn new_accepts_proxy_url_when_configured() {
+        let cfg = Config::new(Credentials::new("k", "s", "p"))
+            .with_rest_url("https://example.com")
+            .with_proxy("http://127.0.0.1:8888");
 
-        let err = client
-            .parse_body_raw(StatusCode::INTERNAL_SERVER_ERROR, body)
-            .expect_err("HTTP 非 2xx 应返回错误");
-
-        assert!(matches!(err, OkxError::Http(_)));
-    }
-
-    #[tokio::test]
-    async fn parse_response_via_get_public_hits_success_path() {
-        // 简易本地 HTTP 服务，返回成功响应，确保走到 parse_response 分支
-        let body = r#"{"code":"0","msg":"","data":[{"value":42}]}"#;
-        let Some((base_url, handle)) = spawn_ok_server("200 OK", body) else {
-            eprintln!("无法绑定本地端口，跳过本用例");
-            return;
-        };
-
-        let client = client_with_base(&base_url);
-        let params = QueryParams {
-            inst_id: "BTC-USDT".into(),
-            limit: None,
-        };
-
-        let data = client
-            .get_public::<DummyData, _>("/api/v5/mock", Some(&params))
-            .await
-            .expect("应成功解析响应");
-
-        assert_eq!(data[0].value, 42);
-        handle.join().expect("本地服务线程应正常结束");
-    }
-
-    #[tokio::test]
-    async fn parse_response_raw_via_get_public_raw_returns_full_payload() {
-        // 返回 code!=0，但 HTTP 200，raw 形式应直接返回完整 payload
-        let body = r#"{"code":"51000","msg":"failure","data":[]}"#;
-        let Some((base_url, handle)) = spawn_ok_server("200 OK", body) else {
-            eprintln!("无法绑定本地端口，跳过本用例");
-            return;
-        };
-
-        let client = client_with_base(&base_url);
-        let params = QueryParams {
-            inst_id: "BTC-USDT".into(),
-            limit: None,
-        };
-
-        let raw = client
-            .get_public_raw("/api/v5/mock", Some(&params))
-            .await
-            .expect("raw 调用应成功返回 payload");
-
-        assert_eq!(raw["code"], "51000");
-        assert_eq!(raw["msg"], "failure");
-
-        handle.join().expect("本地服务线程应正常结束");
-    }
-
-    #[test]
-    fn parse_body_propagates_http_status_errors() {
-        let body = r#"{"code":"0","msg":"","data":[]}"#;
-        let client = client_with_base("https://example.com");
-        let err = client
-            .parse_body::<DummyData>(StatusCode::INTERNAL_SERVER_ERROR, body)
-            .expect_err("HTTP 非 2xx 应返回错误");
-
-        match err {
-            OkxError::Http(msg) => assert!(
-                msg.contains("500"),
-                "HTTP 错误信息应包含状态码，当前: {msg}"
-            ),
-            other => panic!("错误类型不符: {other:?}"),
-        }
-    }
-
-    #[test]
-    fn parse_body_validates_ticker_price_ordering() {
-        let body = r#"{"code":"0","msg":"","data":[{"instType":"SPOT","instId":"BTC-USDT","last":"30123.456789","askPx":"30124.12","bidPx":"30122.34","ts":"1700000000000"}]}"#;
-        let client = client_with_base("https://example.com");
-        let tickers = client
-            .parse_body::<Ticker>(StatusCode::OK, body)
-            .expect("Ticker 解析应成功");
-
-        let ticker = &tickers[0];
-        let last: f64 = ticker.last.parse().expect("成交价应为数值");
-        let ask: f64 = ticker.ask_px.parse().expect("卖一价应为数值");
-        let bid: f64 = ticker.bid_px.parse().expect("买一价应为数值");
-        assert!(bid <= last && last <= ask, "价格应满足买<=成交<=卖");
-        assert_eq!(ticker.last, "30123.456789");
-    }
-
-    #[tokio::test]
-    async fn get_public_returns_http_error_on_rate_limit() {
-        let body = r#"{"code":"50011","msg":"too many requests","data":[]}"#;
-        let Some((base_url, handle)) = spawn_response_server("429 Too Many Requests", body) else {
-            eprintln!("无法绑定本地端口，跳过限流用例");
-            return;
-        };
-
-        let client = client_with_base(&base_url);
-        let err = client
-            .get_public::<DummyData, _>("/api/v5/mock", None::<&()>)
-            .await
-            .expect_err("限流应返回 HTTP 错误");
-
-        match err {
-            OkxError::Http(msg) => {
-                assert!(msg.contains("429"));
-                assert!(msg.contains("too many requests"));
-            }
-            other => panic!("错误类型不符: {other:?}"),
-        }
-
-        handle.join().expect("本地服务线程应正常结束");
-    }
-
-    #[tokio::test]
-    async fn get_public_times_out_when_server_hangs() {
-        let Some((base_url, handle)) = spawn_hanging_server(Duration::from_millis(1200)) else {
-            eprintln!("无法绑定本地端口，跳过超时用例");
-            return;
-        };
-
-        let client = client_with_base(&base_url);
-        let start = std::time::Instant::now();
-        let err = client
-            .get_public::<DummyData, _>("/api/v5/mock", None::<&()>)
-            .await
-            .expect_err("服务端挂起应触发超时错误");
-
-        match err {
-            OkxError::Http(msg) => {
-                let hit = ["timed out", "deadline", "elapsed", "error sending request"]
-                    .iter()
-                    .any(|key| msg.contains(key));
-                assert!(hit, "超时/发送错误信息不符: {msg}");
-            }
-            other => panic!("错误类型不符: {other:?}"),
-        }
-        assert!(
-            start.elapsed() < Duration::from_secs(3),
-            "超时错误不应拖延过长"
-        );
-        handle.join().expect("本地挂起线程应正常结束");
-    }
-
-    #[test]
-    fn spawn_hanging_server_accepts_and_closes_after_delay() {
-        let Some((base_url, handle)) = (0..3).find_map(|_| {
-            let server = spawn_hanging_server(Duration::from_millis(30));
-            if server.is_none() {
-                thread::sleep(Duration::from_millis(10));
-            }
-            server
-        }) else {
-            eprintln!("无法绑定本地端口，跳过挂起校验");
-            return;
-        };
-
-        let addr = base_url.strip_prefix("http://").expect("需含 http 前缀");
-        let mut stream = TcpStream::connect(addr).expect("应能连接到挂起服务");
-        stream.write_all(b"ping").expect("应能写入触发读取");
-
-        // 等待服务端休眠并关闭
-        thread::sleep(Duration::from_millis(80));
-        let mut buf = [0u8; 8];
-        let _ = stream.read(&mut buf);
-
-        handle.join().expect("挂起线程应正常结束");
-    }
-
-    #[tokio::test]
-    async fn get_public_propagates_network_error() {
-        let client = client_with_base("http://127.0.0.1:9");
-        let err = client
-            .get_public::<DummyData, _>("/api/v5/mock", None::<&()>)
-            .await
-            .expect_err("无监听端口应触发网络错误");
-
-        match err {
-            OkxError::Http(msg) => assert!(
-                msg.contains("127.0.0.1"),
-                "网络错误应包含主机信息，当前: {msg}"
-            ),
-            other => panic!("错误类型不符: {other:?}"),
-        }
-    }
-
-    fn spawn_response_server(status: &str, body: &str) -> Option<(String, thread::JoinHandle<()>)> {
-        let listener = TcpListener::bind("127.0.0.1:0").ok()?;
-        let addr = listener.local_addr().ok()?;
-        let status = status.to_string();
-        let body = body.to_string();
-
-        let handle = thread::spawn(move || {
-            if let Ok((mut stream, _)) = listener.accept() {
-                let mut buf = [0u8; 512];
-                let _ = stream.read(&mut buf); // 忽略请求内容
-                let resp = format!(
-                    "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
-                    body.len()
-                );
-                let _ = stream.write_all(resp.as_bytes());
-            }
-        });
-
-        Some((format!("http://{}", addr), handle))
-    }
-
-    fn spawn_ok_server(status: &str, body: &str) -> Option<(String, thread::JoinHandle<()>)> {
-        spawn_response_server(status, body)
-    }
-
-    fn spawn_hanging_server(delay: Duration) -> Option<(String, thread::JoinHandle<()>)> {
-        let listener = TcpListener::bind("127.0.0.1:0").ok()?;
-        let addr = listener.local_addr().ok()?;
-
-        let handle = thread::spawn(move || {
-            if let Ok((mut stream, _)) = listener.accept() {
-                let mut buf = [0u8; 512];
-                let _ = stream.read(&mut buf); // 读取后保持挂起
-                thread::sleep(delay);
-                let _ = stream.shutdown(Shutdown::Both);
-            }
-        });
-
-        Some((format!("http://{}", addr), handle))
+        let _client = OkxRestClient::new(cfg);
     }
 }

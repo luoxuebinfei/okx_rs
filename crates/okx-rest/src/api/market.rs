@@ -261,8 +261,9 @@ pub trait MarketApi {
     ) -> impl std::future::Future<Output = Result<Vec<Trade>>> + Send;
 
     /// Get platform 24H total volume.
-    fn get_platform_24_volume(&self)
-        -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
+    fn get_platform_24_volume(
+        &self,
+    ) -> impl std::future::Future<Output = Result<Vec<Value>>> + Send;
 
     /// Get index components.
     fn get_index_components(

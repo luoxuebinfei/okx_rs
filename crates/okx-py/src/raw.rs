@@ -46,9 +46,8 @@ pub(crate) mod sync {
         body_json: &str,
     ) -> PyResult<Py<PyAny>> {
         let body = parse_required_json_value(body_json, "body_json")?;
-        let value = client.block_on_allow_threads(async {
-            client.rest_client().post_raw(path, &body).await
-        })?;
+        let value = client
+            .block_on_allow_threads(async { client.rest_client().post_raw(path, &body).await })?;
         value_to_py_obj(value)
     }
 }
@@ -82,7 +81,10 @@ pub(crate) mod async_api {
         let params = parse_json_value(params_json.as_deref(), "params_json")?;
         let rest = client.rest_client();
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            let value = rest.get_raw(&path, params.as_ref()).await.map_err(to_py_err)?;
+            let value = rest
+                .get_raw(&path, params.as_ref())
+                .await
+                .map_err(to_py_err)?;
             value_to_py_obj(value)
         })
     }
@@ -96,10 +98,7 @@ pub(crate) mod async_api {
         let body = parse_required_json_value(&body_json, "body_json")?;
         let rest = client.rest_client();
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            let value = rest
-                .post_raw(&path, &body)
-                .await
-                .map_err(to_py_err)?;
+            let value = rest.post_raw(&path, &body).await.map_err(to_py_err)?;
             value_to_py_obj(value)
         })
     }

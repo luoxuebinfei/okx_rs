@@ -439,6 +439,8 @@ impl Stream for ReconnectingWsClient {
 mod tests {
     use super::*;
     use okx_core::{Config, Credentials};
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
     use tokio::time::timeout;
 
     #[test]
@@ -529,6 +531,162 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn do_reconnect_respects_max_attempts_and_sets_failed_state() {
+        let cfg = Config::new(Credentials::new("k", "s", "p"))
+            .with_ws_public_url("ws://127.0.0.1:9/ws")
+            .with_ws_private_url("ws://127.0.0.1:9/ws");
+
+        let reconnect_config = ReconnectConfig::default()
+            .with_initial_delay(Duration::from_millis(1))
+            .with_max_delay(Duration::from_millis(2))
+            .with_max_attempts(1)
+            .with_restore_subscriptions(false);
+
+        let mut client = ReconnectingWsClient {
+            client: None,
+            config: cfg,
+            conn_type: ConnectionType::Public,
+            reconnect_config,
+            state: ConnectionState::Disconnected,
+            subscriptions: HashSet::new(),
+            attempt_count: 0,
+            current_delay: Duration::from_millis(1),
+        };
+
+        let err = timeout(Duration::from_secs(2), client.do_reconnect())
+            .await
+            .expect("重连流程超时")
+            .expect_err("应达到最大重连次数并失败");
+
+        assert_eq!(client.state(), ConnectionState::Failed);
+        assert!(matches!(err, OkxError::Other(_)));
+        assert!(err.to_string().contains("Max reconnection attempts"));
+    }
+
+    #[tokio::test]
+    async fn restore_subscriptions_returns_ok_for_empty_and_invalid_keys() {
+        let cfg = Config::new(Credentials::new("k", "s", "p"));
+        let reconnect_config = ReconnectConfig::default().with_restore_subscriptions(true);
+
+        let mut client = ReconnectingWsClient {
+            client: None,
+            config: cfg,
+            conn_type: ConnectionType::Public,
+            reconnect_config,
+            state: ConnectionState::Connected,
+            subscriptions: HashSet::new(),
+            attempt_count: 0,
+            current_delay: Duration::from_millis(1),
+        };
+
+        // 空订阅应直接返回 Ok
+        client.restore_subscriptions().await.expect("空订阅应 Ok");
+
+        // 插入无法反序列化的 key，channels 为空也应 Ok
+        client
+            .subscriptions
+            .insert(ChannelKey("not-json".to_string()));
+        client
+            .restore_subscriptions()
+            .await
+            .expect("无效 key 应被过滤并返回 Ok");
+    }
+
+    #[tokio::test]
+    async fn subscribe_and_unsubscribe_track_without_inner_client() {
+        let cfg = Config::new(Credentials::new("k", "s", "p"));
+        let reconnect_config = ReconnectConfig::default().with_restore_subscriptions(false);
+
+        let mut client = ReconnectingWsClient {
+            client: None,
+            config: cfg,
+            conn_type: ConnectionType::Public,
+            reconnect_config,
+            state: ConnectionState::Connected,
+            subscriptions: HashSet::new(),
+            attempt_count: 0,
+            current_delay: Duration::from_millis(1),
+        };
+
+        client
+            .subscribe(vec![Channel::Tickers {
+                inst_id: "BTC-USDT".to_string(),
+            }])
+            .await
+            .expect("无内层连接也应允许记录订阅");
+        assert_eq!(client.subscription_count(), 1);
+
+        client
+            .unsubscribe(vec![Channel::Tickers {
+                inst_id: "BTC-USDT".to_string(),
+            }])
+            .await
+            .expect("取消订阅应成功");
+        assert_eq!(client.subscription_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn ping_returns_connection_closed_when_client_none() {
+        let cfg = Config::new(Credentials::new("k", "s", "p"));
+        let reconnect_config = ReconnectConfig::default();
+        let mut client = ReconnectingWsClient {
+            client: None,
+            config: cfg,
+            conn_type: ConnectionType::Public,
+            reconnect_config,
+            state: ConnectionState::Connected,
+            subscriptions: HashSet::new(),
+            attempt_count: 0,
+            current_delay: Duration::from_millis(1),
+        };
+
+        let err = client.ping().await.expect_err("无连接时 ping 应失败");
+        assert!(matches!(err, OkxError::ConnectionClosed));
+    }
+
+    #[tokio::test]
+    async fn stream_poll_next_failed_state_returns_none() {
+        use futures_util::StreamExt;
+
+        let cfg = Config::new(Credentials::new("k", "s", "p"));
+        let reconnect_config = ReconnectConfig::default();
+        let mut client = ReconnectingWsClient {
+            client: None,
+            config: cfg,
+            conn_type: ConnectionType::Public,
+            reconnect_config,
+            state: ConnectionState::Failed,
+            subscriptions: HashSet::new(),
+            attempt_count: 0,
+            current_delay: Duration::from_millis(1),
+        };
+
+        assert!(client.next().await.is_none());
+    }
+
+    #[test]
+    fn stream_poll_next_connected_without_inner_client_sets_disconnected_and_pending() {
+        let cfg = Config::new(Credentials::new("k", "s", "p"));
+        let reconnect_config = ReconnectConfig::default();
+        let mut client = ReconnectingWsClient {
+            client: None,
+            config: cfg,
+            conn_type: ConnectionType::Public,
+            reconnect_config,
+            state: ConnectionState::Connected,
+            subscriptions: HashSet::new(),
+            attempt_count: 0,
+            current_delay: Duration::from_millis(1),
+        };
+
+        let waker = futures_util::task::noop_waker_ref();
+        let mut cx = Context::from_waker(waker);
+        let polled = Pin::new(&mut client).poll_next(&mut cx);
+        assert!(matches!(polled, Poll::Pending));
+        assert_eq!(client.state(), ConnectionState::Disconnected);
+    }
+
+    #[tokio::test]
     async fn test_connect_succeeds_with_local_echo_server() {
         use tokio::net::TcpListener;
         use tokio_tungstenite::accept_async;
@@ -571,5 +729,80 @@ mod tests {
         assert!(client.is_connected());
 
         server.abort();
+    }
+
+    #[tokio::test]
+    async fn close_sets_failed_and_clears_client_when_none() {
+        let cfg = Config::new(Credentials::new("k", "s", "p"));
+        let reconnect_config = ReconnectConfig::default();
+        let mut client = ReconnectingWsClient {
+            client: None,
+            config: cfg,
+            conn_type: ConnectionType::Public,
+            reconnect_config,
+            state: ConnectionState::Connected,
+            subscriptions: HashSet::new(),
+            attempt_count: 0,
+            current_delay: Duration::from_millis(1),
+        };
+
+        client.close().await.expect("close 应返回 Ok");
+        assert_eq!(client.state(), ConnectionState::Failed);
+        assert!(client.client.is_none());
+    }
+
+    #[test]
+    fn stream_poll_next_reconnecting_wakes_and_pending() {
+        let cfg = Config::new(Credentials::new("k", "s", "p"));
+        let reconnect_config = ReconnectConfig::default();
+        let mut client = ReconnectingWsClient {
+            client: None,
+            config: cfg,
+            conn_type: ConnectionType::Public,
+            reconnect_config,
+            state: ConnectionState::Reconnecting,
+            subscriptions: HashSet::new(),
+            attempt_count: 0,
+            current_delay: Duration::from_millis(1),
+        };
+
+        let waker = futures_util::task::noop_waker_ref();
+        let mut cx = Context::from_waker(waker);
+        let polled = Pin::new(&mut client).poll_next(&mut cx);
+        assert!(matches!(polled, Poll::Pending));
+        assert_eq!(client.state(), ConnectionState::Reconnecting);
+    }
+
+    #[tokio::test]
+    async fn reconnect_wrapper_hits_private_create_client_arm() {
+        let cfg = Config::new(Credentials::new("k", "s", "p"))
+            .with_ws_public_url("ws://127.0.0.1:9/ws")
+            .with_ws_private_url("ws://127.0.0.1:9/ws");
+
+        let reconnect_config = ReconnectConfig::default()
+            .with_initial_delay(Duration::from_millis(1))
+            .with_max_delay(Duration::from_millis(1))
+            .with_backoff_multiplier(1.0)
+            .with_max_attempts(1)
+            .with_restore_subscriptions(false);
+
+        let mut client = ReconnectingWsClient {
+            client: None,
+            config: cfg,
+            conn_type: ConnectionType::Private,
+            reconnect_config,
+            state: ConnectionState::Connected,
+            subscriptions: HashSet::new(),
+            attempt_count: 0,
+            current_delay: Duration::from_millis(1),
+        };
+
+        let err = timeout(Duration::from_secs(2), client.reconnect())
+            .await
+            .expect("重连流程超时")
+            .expect_err("应达到最大重连次数并失败");
+
+        assert_eq!(client.state(), ConnectionState::Failed);
+        assert!(matches!(err, OkxError::Other(_)));
     }
 }

@@ -11,6 +11,7 @@ use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, Stream, StreamExt,
 };
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tokio::time::{interval, Interval};
 use tokio_tungstenite::{
@@ -25,16 +26,17 @@ use okx_core::{Config, OkxError, Result, Signer};
 use crate::channel::Channel;
 use crate::message::{WsMessage, WsRequest};
 
-type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
-
 /// WebSocket client for OKX exchange.
 ///
 /// Provides streaming access to real-time market data and account updates.
-pub struct WsClient {
+struct WsClientInner<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
     /// WebSocket write half
-    sink: SplitSink<WsStream, Message>,
+    sink: SplitSink<WebSocketStream<S>, Message>,
     /// WebSocket read half
-    stream: SplitStream<WsStream>,
+    stream: SplitStream<WebSocketStream<S>>,
     /// Client configuration
     config: Config,
     /// Whether this is a private connection
@@ -45,7 +47,22 @@ pub struct WsClient {
     heartbeat: Interval,
 }
 
-impl WsClient {
+impl<S> WsClientInner<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    fn new(ws_stream: WebSocketStream<S>, config: Config, is_private: bool) -> Self {
+        let (sink, stream) = ws_stream.split();
+        Self {
+            sink,
+            stream,
+            config,
+            is_private,
+            is_logged_in: false,
+            heartbeat: interval(Duration::from_secs(25)),
+        }
+    }
+
     /// 处理 WebSocket 消息并转换为 WsMessage，供流或测试使用。
     pub fn handle_message(
         result: std::result::Result<Message, WsError>,
@@ -77,52 +94,6 @@ impl WsClient {
                 Some(Err(OkxError::WebSocket(e.to_string())))
             }
         }
-    }
-
-    /// Connect to the public WebSocket endpoint.
-    ///
-    /// Public channels do not require authentication.
-    pub async fn connect_public(config: &Config) -> Result<Self> {
-        let url = config.ws_public_url();
-        info!("Connecting to public WebSocket: {}", url);
-
-        let (ws_stream, _) = connect_async(url)
-            .await
-            .map_err(|e| OkxError::WebSocket(e.to_string()))?;
-
-        let (sink, stream) = ws_stream.split();
-
-        Ok(Self {
-            sink,
-            stream,
-            config: config.clone(),
-            is_private: false,
-            is_logged_in: false,
-            heartbeat: interval(Duration::from_secs(25)),
-        })
-    }
-
-    /// Connect to the private WebSocket endpoint.
-    ///
-    /// Private channels require authentication via login.
-    pub async fn connect_private(config: &Config) -> Result<Self> {
-        let url = config.ws_private_url();
-        info!("Connecting to private WebSocket: {}", url);
-
-        let (ws_stream, _) = connect_async(url)
-            .await
-            .map_err(|e| OkxError::WebSocket(e.to_string()))?;
-
-        let (sink, stream) = ws_stream.split();
-
-        Ok(Self {
-            sink,
-            stream,
-            config: config.clone(),
-            is_private: true,
-            is_logged_in: false,
-            heartbeat: interval(Duration::from_secs(25)),
-        })
     }
 
     /// Login to the private WebSocket.
@@ -273,7 +244,10 @@ impl WsClient {
     }
 }
 
-impl Stream for WsClient {
+impl<S> Stream for WsClientInner<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
     type Item = Result<WsMessage>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -297,5 +271,318 @@ impl Stream for WsClient {
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
+    }
+}
+
+/// OKX WebSocket 客户端。
+///
+/// 提供公有/私有连接、订阅管理与消息流式读取。
+pub struct WsClient {
+    inner: WsClientInner<MaybeTlsStream<TcpStream>>,
+}
+
+impl WsClient {
+    /// 处理 WebSocket 消息并转换为 WsMessage，供流或测试使用。
+    pub fn handle_message(
+        result: std::result::Result<Message, WsError>,
+    ) -> Option<Result<WsMessage>> {
+        WsClientInner::<MaybeTlsStream<TcpStream>>::handle_message(result)
+    }
+
+    /// Connect to the public WebSocket endpoint.
+    ///
+    /// Public channels do not require authentication.
+    pub async fn connect_public(config: &Config) -> Result<Self> {
+        let url = config.ws_public_url();
+        info!("Connecting to public WebSocket: {}", url);
+
+        let (ws_stream, _) = connect_async(url)
+            .await
+            .map_err(|e| OkxError::WebSocket(e.to_string()))?;
+
+        Ok(Self {
+            inner: WsClientInner::new(ws_stream, config.clone(), false),
+        })
+    }
+
+    /// Connect to the private WebSocket endpoint.
+    ///
+    /// Private channels require authentication via login.
+    pub async fn connect_private(config: &Config) -> Result<Self> {
+        let url = config.ws_private_url();
+        info!("Connecting to private WebSocket: {}", url);
+
+        let (ws_stream, _) = connect_async(url)
+            .await
+            .map_err(|e| OkxError::WebSocket(e.to_string()))?;
+
+        Ok(Self {
+            inner: WsClientInner::new(ws_stream, config.clone(), true),
+        })
+    }
+
+    /// Login to the private WebSocket.
+    ///
+    /// Must be called before subscribing to private channels.
+    pub async fn login(&mut self) -> Result<()> {
+        self.inner.login().await
+    }
+
+    /// Subscribe to channels.
+    ///
+    /// For private channels, login must be called first.
+    pub async fn subscribe(&mut self, channels: Vec<Channel>) -> Result<()> {
+        self.inner.subscribe(channels).await
+    }
+
+    /// Unsubscribe from channels.
+    pub async fn unsubscribe(&mut self, channels: Vec<Channel>) -> Result<()> {
+        self.inner.unsubscribe(channels).await
+    }
+
+    /// Send a ping to keep the connection alive.
+    pub async fn ping(&mut self) -> Result<()> {
+        self.inner.ping().await
+    }
+
+    /// Close the WebSocket connection.
+    pub async fn close(&mut self) -> Result<()> {
+        self.inner.close().await
+    }
+}
+
+impl Stream for WsClient {
+    type Item = Result<WsMessage>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.inner).poll_next(cx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use futures_util::{SinkExt, StreamExt};
+    use okx_core::Credentials;
+    use tokio::io::{duplex, DuplexStream};
+    use tokio::time::timeout;
+    use tokio_tungstenite::{accept_async, client_async};
+
+    async fn in_memory_client(
+        is_private: bool,
+    ) -> (WsClientInner<DuplexStream>, WebSocketStream<DuplexStream>) {
+        let (client_io, server_io) = duplex(1024);
+
+        let (client_res, server_res) = tokio::join!(
+            client_async("ws://localhost/ws", client_io),
+            accept_async(server_io)
+        );
+
+        let (client_ws, _) = client_res.expect("in-memory client handshake 失败");
+        let server_ws = server_res.expect("in-memory server handshake 失败");
+
+        let cfg = Config::new(Credentials::new("k", "s", "p")).simulated(true);
+        (WsClientInner::new(client_ws, cfg, is_private), server_ws)
+    }
+
+    #[tokio::test]
+    async fn private_login_success_handles_ping_and_is_idempotent() {
+        let (mut client, mut server) = in_memory_client(true).await;
+
+        let server_task = tokio::spawn(async move {
+            let msg = server
+                .next()
+                .await
+                .expect("应收到登录请求")
+                .expect("消息应为 Ok");
+            let Message::Text(text) = msg else {
+                panic!("预期 Text 登录请求，实际为: {msg:?}");
+            };
+            let v: serde_json::Value = serde_json::from_str(&text).expect("登录请求应为 JSON");
+            assert_eq!(v.get("op").and_then(|x| x.as_str()), Some("login"));
+
+            let _ = server.send(Message::Ping(vec![1, 2, 3].into())).await;
+            let _ = server.next().await;
+            let _ = server
+                .send(Message::Text(r#"{"event":"subscribe"}"#.into()))
+                .await;
+            let _ = server
+                .send(Message::Text(
+                    r#"{"event":"login","code":"0","msg":"","connId":"local"}"#.into(),
+                ))
+                .await;
+
+            let _ = server.close(None).await;
+        });
+
+        client.login().await.expect("首次登录应成功");
+        client.login().await.expect("重复登录应直接返回 Ok");
+
+        server_task.await.expect("服务端任务不应 panic");
+    }
+
+    #[tokio::test]
+    async fn private_login_failure_returns_auth_error() {
+        let (mut client, mut server) = in_memory_client(true).await;
+
+        let server_task = tokio::spawn(async move {
+            let _ = server.next().await;
+            let _ = server
+                .send(Message::Text(
+                    r#"{"event":"login","code":"60001","msg":"login failed"}"#.into(),
+                ))
+                .await;
+        });
+
+        let err = client.login().await.expect_err("登录应失败");
+        assert!(matches!(err, OkxError::Auth(_)));
+
+        server_task.await.expect("服务端任务不应 panic");
+    }
+
+    #[tokio::test]
+    async fn private_login_error_event_returns_auth_error() {
+        let (mut client, mut server) = in_memory_client(true).await;
+
+        let server_task = tokio::spawn(async move {
+            let _ = server.next().await;
+            let _ = server
+                .send(Message::Text(
+                    r#"{"event":"error","code":"60001","msg":"invalid request"}"#.into(),
+                ))
+                .await;
+        });
+
+        let err = client.login().await.expect_err("登录应返回错误");
+        assert!(matches!(err, OkxError::Auth(_)));
+
+        server_task.await.expect("服务端任务不应 panic");
+    }
+
+    #[tokio::test]
+    async fn private_login_returns_connection_closed_when_server_closes() {
+        let (mut client, mut server) = in_memory_client(true).await;
+
+        let server_task = tokio::spawn(async move {
+            let _ = server.next().await;
+            let _ = server.close(None).await;
+        });
+
+        let err = client.login().await.expect_err("应收到连接关闭错误");
+        assert!(matches!(
+            err,
+            OkxError::ConnectionClosed | OkxError::WebSocket(_)
+        ));
+
+        server_task.await.expect("服务端任务不应 panic");
+    }
+
+    #[tokio::test]
+    async fn subscribing_private_channel_on_public_connection_is_rejected() {
+        let (mut client, _server) = in_memory_client(false).await;
+        let err = client
+            .subscribe(vec![Channel::Account { ccy: None }])
+            .await
+            .expect_err("公有连接不应允许订阅私有频道");
+        assert!(matches!(err, OkxError::Auth(_)));
+    }
+
+    #[tokio::test]
+    async fn subscribe_unsubscribe_and_poll_next_filters_pong() {
+        let (mut client, mut server) = in_memory_client(false).await;
+
+        let server_task = tokio::spawn(async move {
+            // subscribe
+            let msg = server
+                .next()
+                .await
+                .expect("应收到 subscribe 请求")
+                .expect("消息应为 Ok");
+            let Message::Text(text) = msg else {
+                panic!("预期 Text subscribe 请求，实际为: {msg:?}");
+            };
+            let v: serde_json::Value =
+                serde_json::from_str(&text).expect("subscribe 请求应为 JSON");
+            assert_eq!(v.get("op").and_then(|x| x.as_str()), Some("subscribe"));
+
+            let _ = server.send(Message::Pong(vec![9].into())).await;
+            let _ = server
+                .send(Message::Text(r#"{"event":"subscribe"}"#.into()))
+                .await;
+
+            // unsubscribe
+            let msg = server
+                .next()
+                .await
+                .expect("应收到 unsubscribe 请求")
+                .expect("消息应为 Ok");
+            let Message::Text(text) = msg else {
+                panic!("预期 Text unsubscribe 请求，实际为: {msg:?}");
+            };
+            let v: serde_json::Value =
+                serde_json::from_str(&text).expect("unsubscribe 请求应为 JSON");
+            assert_eq!(v.get("op").and_then(|x| x.as_str()), Some("unsubscribe"));
+
+            let _ = server
+                .send(Message::Text(r#"{"event":"unsubscribe"}"#.into()))
+                .await;
+        });
+
+        client
+            .subscribe(vec![Channel::Tickers {
+                inst_id: "BTC-USDT".to_string(),
+            }])
+            .await
+            .expect("订阅应成功发送");
+
+        let msg = timeout(Duration::from_secs(1), client.next())
+            .await
+            .expect("等待 subscribe 事件超时")
+            .expect("应收到消息")
+            .expect("消息应为 Ok");
+        match msg {
+            WsMessage::Event { event, .. } => assert_eq!(event, crate::message::WsEvent::Subscribe),
+            other => panic!("预期 subscribe 事件，实际为: {other:?}"),
+        }
+
+        client
+            .unsubscribe(vec![Channel::Tickers {
+                inst_id: "BTC-USDT".to_string(),
+            }])
+            .await
+            .expect("取消订阅应成功发送");
+
+        let msg = timeout(Duration::from_secs(1), client.next())
+            .await
+            .expect("等待 unsubscribe 事件超时")
+            .expect("应收到消息")
+            .expect("消息应为 Ok");
+        match msg {
+            WsMessage::Event { event, .. } => {
+                assert_eq!(event, crate::message::WsEvent::Unsubscribe)
+            }
+            other => panic!("预期 unsubscribe 事件，实际为: {other:?}"),
+        }
+
+        server_task.await.expect("服务端任务不应 panic");
+    }
+
+    #[tokio::test]
+    async fn ping_sends_text_ping() {
+        let (mut client, mut server) = in_memory_client(false).await;
+
+        client.ping().await.expect("ping 发送失败");
+
+        let msg = timeout(Duration::from_secs(1), server.next())
+            .await
+            .expect("等待 ping 超时")
+            .expect("应收到消息")
+            .expect("消息应为 Ok");
+
+        let Message::Text(text) = msg else {
+            panic!("预期 Text ping，实际为: {msg:?}");
+        };
+        assert_eq!(text, "ping");
     }
 }

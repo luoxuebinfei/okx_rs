@@ -40,3 +40,9 @@ fn handle_message_pong_close_and_error() {
         .unwrap_err();
     assert!(matches!(err_msg, okx_core::OkxError::WebSocket(_)));
 }
+
+#[test]
+fn handle_message_binary_is_ignored() {
+    let bin = Message::Binary(vec![1, 2, 3].into());
+    assert!(WsClient::handle_message(Ok(bin)).is_none());
+}

@@ -25,4 +25,3 @@ impl PyOkxClient {
         raw_impl::sync::post_private_raw(self, path, body_json)
     }
 }
-

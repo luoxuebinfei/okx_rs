@@ -8,8 +8,8 @@ use okx_rest::api::market::{
 };
 use okx_rest::api::public::{
     GetConvertContractCoinParams, GetDeliveryExerciseHistoryParams, GetDiscountQuotaParams,
-    GetEstimatedPriceParams, GetFundingRateHistoryParams, GetInstrumentsParams,
-    GetInstrumentTickBandsParams, GetInsuranceFundParams, GetMarkPriceParams, GetOpenInterestParams,
+    GetEstimatedPriceParams, GetFundingRateHistoryParams, GetInstrumentTickBandsParams,
+    GetInstrumentsParams, GetInsuranceFundParams, GetMarkPriceParams, GetOpenInterestParams,
     GetOptSummaryParams, GetOptionTradesParams, GetPositionTiersParams, GetPriceLimitParams,
     GetUnderlyingParams,
 };
@@ -254,9 +254,8 @@ pub(crate) mod sync {
     }
 
     pub(crate) fn get_exchange_rate(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
-        let res = client.block_on_allow_threads(async {
-            client.rest_client().get_exchange_rate().await
-        })?;
+        let res = client
+            .block_on_allow_threads(async { client.rest_client().get_exchange_rate().await })?;
         values_to_py_list(res)
     }
 

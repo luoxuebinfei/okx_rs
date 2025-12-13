@@ -82,8 +82,9 @@ pub(crate) mod sync {
     }
 
     pub(crate) fn get_account_risk_state(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
-        let values = client
-            .block_on_allow_threads(async { client.rest_client().get_account_risk_state().await })?;
+        let values = client.block_on_allow_threads(async {
+            client.rest_client().get_account_risk_state().await
+        })?;
         values_to_py_list(values)
     }
 

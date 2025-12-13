@@ -156,7 +156,9 @@ pub(crate) mod sync {
         map_values(Ok(res))
     }
 
-    pub(crate) fn flexible_loan_borrow_currencies(client: &PyOkxClient) -> PyResult<Vec<Py<PyAny>>> {
+    pub(crate) fn flexible_loan_borrow_currencies(
+        client: &PyOkxClient,
+    ) -> PyResult<Vec<Py<PyAny>>> {
         let res = client.block_on_allow_threads(async {
             client.rest_client().flexible_loan_borrow_currencies().await
         })?;
@@ -229,7 +231,10 @@ pub(crate) mod sync {
     ) -> PyResult<Vec<Py<PyAny>>> {
         let params = parse_params(params_json)?;
         let res = client.block_on_allow_threads(async {
-            client.rest_client().flexible_loan_loan_history(params).await
+            client
+                .rest_client()
+                .flexible_loan_loan_history(params)
+                .await
         })?;
         map_values(Ok(res))
     }
@@ -268,7 +273,10 @@ pub(crate) mod sync {
     ) -> PyResult<Vec<Py<PyAny>>> {
         let request = parse_request(request_json)?;
         let res = client.block_on_allow_threads(async {
-            client.rest_client().staking_defi_eth_purchase(request).await
+            client
+                .rest_client()
+                .staking_defi_eth_purchase(request)
+                .await
         })?;
         map_values(Ok(res))
     }
@@ -304,7 +312,10 @@ pub(crate) mod sync {
     ) -> PyResult<Vec<Py<PyAny>>> {
         let params = parse_required_json_value(params_json, "params_json")?;
         let res = client.block_on_allow_threads(async {
-            client.rest_client().staking_defi_eth_apy_history(params).await
+            client
+                .rest_client()
+                .staking_defi_eth_apy_history(params)
+                .await
         })?;
         map_values(Ok(res))
     }
@@ -329,7 +340,10 @@ pub(crate) mod sync {
     ) -> PyResult<Vec<Py<PyAny>>> {
         let request = parse_request(request_json)?;
         let res = client.block_on_allow_threads(async {
-            client.rest_client().staking_defi_sol_purchase(request).await
+            client
+                .rest_client()
+                .staking_defi_sol_purchase(request)
+                .await
         })?;
         map_values(Ok(res))
     }
@@ -365,7 +379,10 @@ pub(crate) mod sync {
     ) -> PyResult<Vec<Py<PyAny>>> {
         let params = parse_required_json_value(params_json, "params_json")?;
         let res = client.block_on_allow_threads(async {
-            client.rest_client().staking_defi_sol_apy_history(params).await
+            client
+                .rest_client()
+                .staking_defi_sol_apy_history(params)
+                .await
         })?;
         map_values(Ok(res))
     }
@@ -658,7 +675,10 @@ pub(crate) mod async_api {
         let rest = client.rest_client();
         let params = parse_params(params_json.as_deref())?;
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            map_values(rest.flexible_loan_max_collateral_redeem_amount(params).await)
+            map_values(
+                rest.flexible_loan_max_collateral_redeem_amount(params)
+                    .await,
+            )
         })
     }
 
