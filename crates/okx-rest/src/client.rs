@@ -693,7 +693,7 @@ mod tests {
                 let _ = stream.read(&mut buf); // 忽略请求内容
                 let resp = format!(
                     "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
-                    body.as_bytes().len()
+                    body.len()
                 );
                 let _ = stream.write_all(resp.as_bytes());
             }

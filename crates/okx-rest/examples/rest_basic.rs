@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if has_real_key {
         let balances = client.get_balance(None).await?;
         let total_eq = balances
-            .get(0)
+            .first()
             .map(|b| b.total_eq.clone())
             .unwrap_or_else(|| "0".to_string());
         println!("Total equity: {total_eq}");

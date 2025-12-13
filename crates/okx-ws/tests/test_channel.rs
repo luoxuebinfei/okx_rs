@@ -119,7 +119,7 @@ fn test_private_channel_serialization_and_flags() {
     assert_eq!(value["channel"], "orders");
     assert_eq!(value["instType"], "SPOT");
     assert_eq!(value["instId"], "BTC-USDT");
-    assert!(!value.get("instFamily").is_some());
+    assert!(value.get("instFamily").is_none());
 
     let orders_algo = Channel::OrdersAlgo {
         inst_type: "SWAP".into(),

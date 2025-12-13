@@ -6,7 +6,7 @@ use okx_core::types::{ApiResponse, Bar, InstType, OrdType, PosSide, Side, TdMode
 fn test_api_response_success_flag() {
     let resp = ApiResponse {
         code: "0".into(),
-        msg: "".into(),
+        msg: String::new(),
         data: vec![1, 2, 3],
     };
     assert!(resp.is_success());

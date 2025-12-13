@@ -105,8 +105,8 @@ mod signer_tests {
     fn test_timestamp_format() {
         let ts = Signer::timestamp();
         // Format: 2024-01-01T12:00:00.000Z
-        assert!(ts.contains("T"));
-        assert!(ts.ends_with("Z"));
+        assert!(ts.contains('T'));
+        assert!(ts.ends_with('Z'));
         assert!(ts.len() >= 20);
     }
 
@@ -277,7 +277,7 @@ mod types_tests {
     fn test_api_response_success() {
         let response: ApiResponse<String> = ApiResponse {
             code: "0".to_string(),
-            msg: "".to_string(),
+            msg: String::new(),
             data: vec!["test".to_string()],
         };
         assert!(response.is_success());
