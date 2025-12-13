@@ -269,7 +269,7 @@ pub struct Instrument {
     /// Contract type: linear, inverse
     #[serde(default)]
     pub ct_type: String,
-    /// Alias (for futures): this_week, next_week, quarter, next_quarter
+    /// Alias (for futures): `this_week`, `next_week`, `quarter`, `next_quarter`
     #[serde(default)]
     pub alias: String,
     /// Instrument status: live, suspend, preopen, settlement

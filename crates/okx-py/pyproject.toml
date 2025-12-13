@@ -52,7 +52,18 @@ module-name = "okx_py"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "integration: 依赖网络或真实凭证的集成测试",
+]
 
 [tool.mypy]
 python_version = "3.9"
 strict = true
+
+[dependency-groups]
+dev = [
+    "maturin>=1.10.2",
+    "mypy>=1.0",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+]

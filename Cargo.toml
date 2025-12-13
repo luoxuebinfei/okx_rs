@@ -44,7 +44,8 @@ tracing = "0.1"
 url = "2"
 
 # Python 绑定 (仅 okx-py 使用)
-pyo3 = { version = "0.27", features = ["extension-module"] }
+# multiple-pymethods: 允许同一 #[pyclass] 有多个 #[pymethods] 块，用于按业务域拆分方法
+pyo3 = { version = "0.27", features = ["extension-module", "multiple-pymethods"] }
 
 # 内部 crates
 okx-core = { path = "crates/okx-core" }

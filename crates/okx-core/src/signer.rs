@@ -5,7 +5,7 @@
 //! Source: `okx/utils.py` in <https://github.com/okxapi/python-okx>
 //!
 //! 1. Create pre-hash string: `timestamp + METHOD + requestPath + body`
-//! 2. Sign with HMAC-SHA256 using secret_key
+//! 2. Sign with HMAC-SHA256 using `secret_key`
 //! 3. Base64 encode the signature
 //!
 //! ## Header Names
@@ -91,6 +91,11 @@ impl Signer {
     ///
     /// * `message` - The message to sign (pre-hash string)
     /// * `secret_key` - The secret key for signing
+    ///
+    /// ## Panics
+    ///
+    /// 当 HMAC 初始化失败时会触发 panic。按 HMAC 规范密钥长度不受限，因此该情况理论上不会发生；
+    /// 若发生，通常意味着底层依赖或构建环境异常。
     #[must_use]
     pub fn sign(message: &str, secret_key: &str) -> String {
         let mut mac = HmacSha256::new_from_slice(secret_key.as_bytes())
@@ -111,7 +116,7 @@ impl Signer {
     ///
     /// ## Returns
     ///
-    /// A vector of (header_name, header_value) pairs.
+    /// A vector of (`header_name`, `header_value`) pairs.
     #[must_use]
     pub fn generate_headers(
         &self,
@@ -165,11 +170,11 @@ impl Signer {
     ///
     /// ## Returns
     ///
-    /// A tuple of (api_key, passphrase, timestamp, sign)
+    /// A tuple of (`api_key`, `passphrase`, `timestamp`, `sign`)
     #[must_use]
     pub fn generate_ws_login_params(&self) -> (String, String, String, String) {
         let timestamp = Utc::now().timestamp().to_string();
-        let message = format!("{}GET/users/self/verify", timestamp);
+        let message = format!("{timestamp}GET/users/self/verify");
         let signature = Self::sign(&message, self.credentials.secret_key());
 
         (

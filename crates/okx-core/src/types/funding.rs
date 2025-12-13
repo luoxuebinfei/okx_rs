@@ -236,6 +236,7 @@ pub struct WithdrawalResponse {
 /// Source: GET /api/v5/asset/currencies response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
 pub struct CurrencyInfo {
     /// Currency
     pub ccy: String,

@@ -127,7 +127,7 @@
 - [x] 9.3 Rust REST：补齐 Public 端点 `price-limit`、`opt-summary`、`estimated-price`、`discount-rate-interest-free-quota`、`interest-rate-loan-quota`、`underlying`、`insurance-fund`、`convert-contract-coin`（含参数结构与实现）。
 - [x] 9.4 Python REST 绑定：同步暴露 9.1-9.3 新增方法（同步/异步），更新注释与参数。
 - [x] 9.5 Python WS 绑定：补齐 Rust 已有频道映射 `books5`、`books50-l2-tbt`、`books-l2-tbt`、`mark-price`、`index-tickers`、`funding-rate`、`orders-algo`、`balance_and_position`。
-- [ ] 9.6 官方文档未覆盖模块排查与计划：SubAccount、Convert（闪兑）、CopyTrading/策略、Broker 等家族是否需要纳入；如需，拆分新任务与变更提案。
+- [x] 9.6 官方文档未覆盖模块排查与计划：SubAccount、Convert（闪兑）、CopyTrading/策略、Broker 等家族是否需要纳入；如需，拆分新任务与变更提案。（结论见 `openspec/changes/add-okx-rust-sdk/module_audit.md`）
 
 ## Dependencies
 

@@ -38,13 +38,29 @@
 //! asyncio.run(main())
 //! ```
 
+#![allow(clippy::too_many_arguments)]
+// PyO3 绑定需要直接暴露 OKX 的参数表，很多方法参数数量天然偏多；
+// 该 lint 在此类“外部 API 适配层”上价值有限，统一放宽以避免噪音阻塞 clippy。
+
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use serde_json::Value;
 
+mod account;
 mod async_client;
+mod block_rfq;
+mod broker;
 mod client;
+mod convert;
+mod copy_trading;
+mod finance;
+mod funding;
+mod grid;
+mod public;
+mod spread;
+mod subaccount;
+mod trading_data;
 mod types;
 mod ws_client;
 
@@ -109,6 +125,15 @@ pub(crate) fn parse_json_value(input: Option<&str>, field: &str) -> PyResult<Opt
             .map(Some)
             .map_err(|e| PyValueError::new_err(format!("{field} JSON 解析失败: {e}"))),
     }
+}
+
+/// 解析必填 JSON 字符串为 `serde_json::Value`。
+///
+/// 与 `parse_json_value` 的差异：
+/// - 该函数将 `""/空白` 视为错误，而非 `None`
+pub(crate) fn parse_required_json_value(input: &str, field: &str) -> PyResult<Value> {
+    let parsed = parse_json_value(Some(input), field)?;
+    parsed.ok_or_else(|| PyValueError::new_err(format!("{field} 不能为空")))
 }
 
 /// 解析 JSON 字符串为 `Vec<Value>`。

@@ -1,5 +1,9 @@
 # OKX Rust SDK Justfile
 
+# 说明：
+# - 在 CI/沙盒（workspace-write）环境中，通常禁止写入 $HOME（例如 ~/.cache/uv）。
+# - 这里将 uv 的缓存/临时目录固定到仓库内，保证 `just py-*` 可复现且不依赖宿主机目录权限。
+
 # 默认命令：显示帮助
 default:
     @just --list
@@ -34,41 +38,34 @@ fmt:
 
 # 构建 Python 绑定
 py-build:
-    cd crates/okx-py && maturin develop
+    mkdir -p .uv-cache .cache
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation --no-sync maturin develop
 
 # 运行 Python 测试
 py-test: py-build
-    #!/usr/bin/env bash
-    source .venv/bin/activate
-    cd crates/okx-py
-    pytest tests/ -v
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation --no-sync pytest tests/ -v
 
 # 运行 Python 测试（详细模式）
 py-test-verbose: py-build
-    #!/usr/bin/env bash
-    source .venv/bin/activate
-    cd crates/okx-py
-    pytest tests/ -vv -s
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation --no-sync pytest tests/ -vv -s
 
 # 运行特定的 Python 测试文件
 py-test-file FILE: py-build
-    #!/usr/bin/env bash
-    source .venv/bin/activate
-    cd crates/okx-py
-    pytest tests/{{FILE}} -v
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation --no-sync pytest tests/{{FILE}} -v
 
 # 运行 Python 类型检查
 py-typecheck:
-    #!/usr/bin/env bash
-    source .venv/bin/activate
-    cd crates/okx-py
-    mypy python/okx_py
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation --no-sync mypy python/okx_py
+
+# 校验 Python 类型存根与运行时一致性（需要先执行 `just py-setup` 安装 dev 依赖）
+py-stubtest: py-build
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache MYPYPATH=python uv run --no-build-isolation --no-sync python -m mypy.stubtest okx_py.okx_py
 
 # 清理构建产物
 clean:
     cargo clean
     rm -rf crates/okx-py/target
-    rm -rf .venv/lib/python*/site-packages/okx_py*
+    rm -rf crates/okx-py/.venv/lib/python*/site-packages/okx_py*
 
 # 完整的 CI 检查
 ci: fmt clippy test py-test
@@ -76,12 +73,13 @@ ci: fmt clippy test py-test
 
 # 发布 Python 包（本地测试）
 py-build-release:
-    cd crates/okx-py && maturin build --release
+    mkdir -p .uv-cache .cache
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation --no-sync maturin build --release
 
 # 安装 Python 开发依赖
 py-setup:
-    uv venv --python 3.12
-    source .venv/bin/activate && cd crates/okx-py && uv pip install -e ".[dev]"
+    mkdir -p .uv-cache .cache
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv sync --dev
 
 # 生成 HTML 覆盖率（仅 Rust 代码，WSL 友好）
 cov-html:

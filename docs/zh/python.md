@@ -16,7 +16,7 @@ PyPI 发布准备见 `docs/zh/release.md`。
 - 业务类型均来自 Rust `okx-core::types`，经 PyO3 转换后为 Python 对象（如 `Balance`, `Position`, `Order`, `Ticker` 等），字段名保持官方响应命名（camelCase）。
 
 ## 同步 REST 客户端 `OkxClient`
-来源：`crates/okx-py/src/client.rs`。所有方法返回 Python 对象/字典列表，与官方 REST 路径一致：
+来源：`crates/okx-py/src/client/mod.rs`（绑定入口）与 `crates/okx-py/src/client/*.rs`（按业务域拆分）。所有方法返回 Python 对象/字典列表，与官方 REST 路径一致：
 - `get_balance(ccy=None)` → `/api/v5/account/balance`
 - `get_positions(inst_type=None, inst_id=None)` → `/api/v5/account/positions`
 - `place_order(inst_id, td_mode, side, ord_type, sz, px=None, cl_ord_id=None)` → `/api/v5/trade/order`
@@ -30,7 +30,7 @@ PyPI 发布准备见 `docs/zh/release.md`。
 - 公共服务：`get_system_time()` → `/api/v5/public/system-time`
 
 ## 异步 REST 客户端 `AsyncOkxClient`
-来源：`crates/okx-py/src/async_client.rs`。方法集合与 `OkxClient` 对齐，返回 `await` 后的结果：
+来源：`crates/okx-py/src/async_client/mod.rs`（绑定入口）与 `crates/okx-py/src/async_client/*.rs`（按业务域拆分）。方法集合与 `OkxClient` 对齐，返回 `await` 后的结果：
 - `get_balance`, `get_positions`, `place_order`, `cancel_order`, `get_order`, `get_orders_pending`
 - 公共行情：`get_ticker`, `get_tickers`, `get_instruments`
 - 公共服务：`get_system_time`
@@ -92,6 +92,7 @@ PyPI 发布准备见 `docs/zh/release.md`。
 | 私有订单 | `orders` | `await ws.subscribe_orders(inst_type, inst_id=None)` |
 
 ## WebSocket 未暴露频道（可扩展绑定）
+已补齐并暴露以下频道方法（见 `crates/okx-py/src/ws_client.rs` 与 `crates/okx-ws` 对应实现）：
 - 深度精简频道：`books5`、`books50-l2-tbt`、`books-l2-tbt`
 - 指数/资金费率/标记价格：`index-tickers`、`funding-rate`、`mark-price`
 - 策略订单：`orders-algo`

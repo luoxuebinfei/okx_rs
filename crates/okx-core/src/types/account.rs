@@ -374,8 +374,8 @@ pub struct AccountConfig {
     /// 1: Simple, 2: Single-currency margin, 3: Multi-currency margin, 4: Portfolio margin
     pub acct_lv: String,
     /// Position mode
-    /// long_short_mode: Dual-position mode
-    /// net_mode: One-way position mode
+    /// `long_short_mode`: Dual-position mode
+    /// `net_mode`: One-way position mode
     pub pos_mode: String,
     /// Auto borrow flag
     #[serde(default)]

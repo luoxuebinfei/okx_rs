@@ -1,3 +1,23 @@
 [alias]
 # 覆盖率入口：使用 cargo-llvm-cov 生成工作区覆盖率与 lcov 报告（不含 doctest，兼容 stable toolchain）
 coverage = "llvm-cov --workspace --all-features --exclude okx-py --lcov --output-path target/lcov.info"
+
+# WSL2 编译优化配置
+[build]
+# 限制并行编译任务数，适配 WSL2 资源受限环境
+# 设为 1 避免内存不足导致崩溃
+jobs = 1
+
+[profile.dev]
+# 增加代码生成单元，减少单次内存占用
+codegen-units = 16
+# 启用增量编译
+incremental = true
+# 减少优化级别加快编译
+opt-level = 0
+# 减少调试信息
+debug = 1
+
+[profile.dev.package."*"]
+# 依赖包使用最小优化
+opt-level = 0

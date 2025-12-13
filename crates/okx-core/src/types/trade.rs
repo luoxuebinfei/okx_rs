@@ -18,7 +18,7 @@ pub struct Order {
     pub inst_type: String,
     /// Instrument ID
     pub inst_id: String,
-    /// Trade currency (for SPOT/MARGIN tgtCcy=quote_ccy)
+    /// Trade currency (for SPOT/MARGIN `tgtCcy=quote_ccy`)
     #[serde(default)]
     pub tgt_ccy: String,
     /// Margin currency
@@ -40,7 +40,7 @@ pub struct Order {
     /// Profit and loss
     #[serde(default)]
     pub pnl: String,
-    /// Order type (market, limit, post_only, fok, ioc, etc.)
+    /// Order type (market, limit, `post_only`, fok, ioc, etc.)
     pub ord_type: String,
     /// Order side (buy, sell)
     pub side: String,
@@ -67,7 +67,7 @@ pub struct Order {
     /// Average filled price
     #[serde(default)]
     pub avg_px: String,
-    /// Order state (created, live, partially_filled, canceled, filled)
+    /// Order state (created, live, `partially_filled`, canceled, filled)
     pub state: String,
     /// Leverage
     #[serde(default)]
@@ -266,11 +266,11 @@ pub struct PlaceOrderRequest {
     pub td_mode: String,
     /// Order side: buy, sell
     pub side: String,
-    /// Order type: market, limit, post_only, fok, ioc
+    /// Order type: market, limit, `post_only`, fok, ioc
     pub ord_type: String,
     /// Quantity to buy or sell
     pub sz: String,
-    /// Currency (for SPOT/MARGIN orders in tgtCcy=quote_ccy mode)
+    /// Currency (for SPOT/MARGIN orders in `tgtCcy=quote_ccy` mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
     /// Client-supplied order ID (max 32 characters)
@@ -288,7 +288,7 @@ pub struct PlaceOrderRequest {
     /// Whether to reduce position only
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reduce_only: Option<bool>,
-    /// Target currency: base_ccy, quote_ccy
+    /// Target currency: `base_ccy`, `quote_ccy`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tgt_ccy: Option<String>,
     /// Take-profit trigger price
@@ -315,7 +315,7 @@ pub struct PlaceOrderRequest {
     /// Self trade prevention ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stp_id: Option<String>,
-    /// Self trade prevention mode: cancel_maker, cancel_taker, cancel_both
+    /// Self trade prevention mode: `cancel_maker`, `cancel_taker`, `cancel_both`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stp_mode: Option<String>,
     /// Attached algo orders (TP/SL orders attached to this order)
@@ -487,7 +487,7 @@ pub struct PlaceAlgoOrderRequest {
     pub td_mode: String,
     /// Order side: buy, sell
     pub side: String,
-    /// Order type: conditional, oco, trigger, move_order_stop, iceberg, twap
+    /// Order type: conditional, oco, trigger, `move_order_stop`, iceberg, twap
     pub ord_type: String,
     /// Quantity
     pub sz: String,
@@ -612,7 +612,7 @@ pub struct AlgoOrder {
     /// Currency
     #[serde(default)]
     pub ccy: String,
-    /// State: live, pause, effective, canceled, order_failed
+    /// State: live, pause, effective, canceled, `order_failed`
     pub state: String,
     /// Trigger price
     #[serde(default)]

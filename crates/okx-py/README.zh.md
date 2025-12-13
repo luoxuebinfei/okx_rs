@@ -64,11 +64,11 @@ asyncio.run(main())
 
 ## API 范围（以代码为准）
 - **Config / Credentials**：对应 Rust `okx-core::Config`，支持 `simulated`、超时、代理、自定义端点。
-- **同步客户端 `OkxClient`**（`src/client.rs`）：
+- **同步客户端 `OkxClient`**（`src/client/mod.rs`，按业务域拆分至 `src/client/*.rs`）：
   - 账户：`get_balance(ccy=None)`、`get_positions(inst_type=None, inst_id=None)`
   - 交易：`place_order(...)`、`cancel_order(...)`、`get_order(...)`、`get_orders_pending(...)`
   - 行情/公共：`get_ticker`、`get_tickers`、`get_instruments`、`get_system_time`
-- **异步客户端 `AsyncOkxClient`**（`src/async_client.rs`）：方法与同步版一致，返回 awaitable。
+- **异步客户端 `AsyncOkxClient`**（`src/async_client/mod.rs`，按业务域拆分至 `src/async_client/*.rs`）：方法与同步版一致，返回 awaitable。
 - **WS 客户端 `WsClient`**（`src/ws_client.rs`）：
   - 连接：`connect_public` / `connect_private`
   - 订阅：`subscribe_tickers`、`subscribe_orderbook`、`subscribe_trades`、`subscribe_candles(interval=1m/5m/15m/1H/4H/1D)`、`subscribe_account`、`subscribe_positions`、`subscribe_orders`
@@ -81,6 +81,8 @@ asyncio.run(main())
 
 ## 开发与测试
 - 常用脚本：`just py-build`、`just py-test`、`just py-test-verbose`、`just py-typecheck`。
+- 类型存根一致性：先 `just py-setup` 再 `just py-stubtest`。
+- 绑定实现采用多 `#[pymethods]` 拆分（workspace 已启用 `pyo3/multiple-pymethods`），各业务域入口见 `src/client/*.rs` 与 `src/async_client/*.rs`。
 - 覆盖率（含 Rust + Python）：`just cov-html`（参见 `scripts/cov-html.sh`）。
 - 发布步骤：`docs/zh/release.md`。
 
