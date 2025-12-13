@@ -7,16 +7,59 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
-  lint-test:
-    runs-on: ubuntu-latest
+  # Rust 代码检查与测试（不含 Python 绑定）
+  rust:
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: 格式检查
+        run: cargo fmt --all -- --check
+
+      - name: Clippy 检查
+        run: cargo clippy --workspace --exclude okx-py --all-targets --all-features -- -D warnings
+
+      - name: 运行测试
+        run: cargo test --workspace --exclude okx-py --all-features
+
+  # MSRV 检查（最低支持 Rust 版本）
+  msrv:
+    name: MSRV (1.75)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@1.75
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: 检查 MSRV 兼容性
+        run: cargo check --workspace --exclude okx-py --all-features
+
+  # Python 绑定测试
+  python:
+    name: Python 绑定
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
 
       - uses: actions/setup-python@v5
         with:
@@ -37,31 +80,20 @@ jobs:
           cd crates/okx-py
           uv pip install -e ".[dev]"
 
-      - name: Rust fmt
-        run: cargo fmt --all -- --check
-
-      - name: Clippy
-        run: cargo clippy --all -- -D warnings
-
-      - name: Rust tests
-        run: cargo test --all
-
-      - name: Python tests
+      - name: Python 测试
         shell: bash
         run: |
           set -euo pipefail
           source .venv/bin/activate
           just py-test
 
+  # 依赖安全审计
   audit:
+    name: 安全审计
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: 安装 cargo-audit
-        run: cargo install cargo-audit
-
-      - name: 依赖安全审计
-        run: cargo audit
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
