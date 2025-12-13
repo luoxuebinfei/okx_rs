@@ -9,16 +9,27 @@ use crate::OkxRestClient;
 
 /// 端点常量。
 pub mod endpoints {
+    /// 下单
     pub const PLACE_ORDER: &str = "/api/v5/sprd/order";
+    /// 撤单
     pub const CANCEL_ORDER: &str = "/api/v5/sprd/cancel-order";
+    /// 撤销所有订单
     pub const CANCEL_ALL_ORDERS: &str = "/api/v5/sprd/mass-cancel";
+    /// 获取订单详情
     pub const ORDER_DETAILS: &str = "/api/v5/sprd/order";
+    /// 获取未完成订单
     pub const ACTIVE_ORDERS: &str = "/api/v5/sprd/orders-pending";
+    /// 获取历史订单
     pub const ORDERS: &str = "/api/v5/sprd/orders-history";
+    /// 获取成交记录
     pub const TRADES: &str = "/api/v5/sprd/trades";
+    /// 获取可交易价差
     pub const SPREADS: &str = "/api/v5/sprd/spreads";
+    /// 获取价差深度
     pub const ORDER_BOOK: &str = "/api/v5/sprd/books";
+    /// 获取价差行情
     pub const TICKER: &str = "/api/v5/sprd/ticker";
+    /// 获取公共成交记录
     pub const PUBLIC_TRADES: &str = "/api/v5/sprd/public-trades";
 }
 

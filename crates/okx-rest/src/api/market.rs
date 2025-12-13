@@ -153,9 +153,12 @@ pub struct GetIndexTickersParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBlockTickersParams {
+    /// Instrument type: SPOT, SWAP, FUTURES, OPTION
     pub inst_type: String,
+    /// Underlying (for FUTURES/SWAP/OPTION)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uly: Option<String>,
+    /// Instrument family (for FUTURES/SWAP/OPTION)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_family: Option<String>,
 }
@@ -169,6 +172,7 @@ pub type GetMarkPriceCandlesParams = GetCandlesParams;
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetOptionFamilyTradesParams {
+    /// Instrument family, e.g., "BTC-USD"
     pub inst_family: String,
 }
 
@@ -176,6 +180,7 @@ pub struct GetOptionFamilyTradesParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetIndexComponentsParams {
+    /// Index name, e.g., "BTC-USD"
     pub index: String,
 }
 

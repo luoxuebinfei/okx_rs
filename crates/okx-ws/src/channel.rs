@@ -204,10 +204,13 @@ pub enum Channel {
     /// Grid algo orders channel
     #[serde(rename = "grid-orders")]
     GridOrders {
+        /// 算法订单 ID
         #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
         algo_id: Option<String>,
+        /// 产品类型
         #[serde(rename = "instType", skip_serializing_if = "Option::is_none")]
         inst_type: Option<String>,
+        /// 产品 ID
         #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
         inst_id: Option<String>,
     },
@@ -215,6 +218,7 @@ pub enum Channel {
     /// Copy trading lead notifications channel
     #[serde(rename = "copytrading-lead-notify")]
     CopyTradingLeadNotify {
+        /// 产品 ID
         #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
         inst_id: Option<String>,
     },
@@ -222,6 +226,7 @@ pub enum Channel {
     /// Recurring buy orders channel
     #[serde(rename = "recurring-orders")]
     RecurringOrders {
+        /// 算法订单 ID
         #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
         algo_id: Option<String>,
     },
@@ -229,6 +234,7 @@ pub enum Channel {
     /// Block trading RFQs（business私有）
     #[serde(rename = "rfqs")]
     Rfqs {
+        /// 交易品种
         #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
         inst_family: Option<String>,
     },
@@ -236,6 +242,7 @@ pub enum Channel {
     /// Block trading quotes（business私有）
     #[serde(rename = "quotes")]
     Quotes {
+        /// 交易品种
         #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
         inst_family: Option<String>,
     },
@@ -243,6 +250,7 @@ pub enum Channel {
     /// 结构化大宗成交（私有）
     #[serde(rename = "struc-block-trades")]
     StrucBlockTrades {
+        /// 交易品种
         #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
         inst_family: Option<String>,
     },
@@ -250,6 +258,7 @@ pub enum Channel {
     /// 公开结构化大宗成交（公共）
     #[serde(rename = "public-struc-block-trades")]
     PublicStrucBlockTrades {
+        /// 交易品种
         #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
         inst_family: Option<String>,
     },
@@ -257,6 +266,7 @@ pub enum Channel {
     /// 公开大宗成交（公共）
     #[serde(rename = "public-block-trades")]
     PublicBlockTrades {
+        /// 交易品种
         #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
         inst_family: Option<String>,
     },
@@ -264,6 +274,7 @@ pub enum Channel {
     /// Block Tickers（公共）
     #[serde(rename = "block-tickers")]
     BlockTickers {
+        /// 交易品种
         #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
         inst_family: Option<String>,
     },
@@ -271,10 +282,13 @@ pub enum Channel {
     /// 高级算法频道（私有）
     #[serde(rename = "algo-advance")]
     AlgoAdvance {
+        /// 产品类型
         #[serde(rename = "instType", skip_serializing_if = "Option::is_none")]
         inst_type: Option<String>,
+        /// 交易品种
         #[serde(rename = "instFamily", skip_serializing_if = "Option::is_none")]
         inst_family: Option<String>,
+        /// 产品 ID
         #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
         inst_id: Option<String>,
     },
@@ -282,8 +296,10 @@ pub enum Channel {
     /// 现货网格订单（私有）
     #[serde(rename = "grid-orders-spot")]
     GridOrdersSpot {
+        /// 算法订单 ID
         #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
         algo_id: Option<String>,
+        /// 产品 ID
         #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
         inst_id: Option<String>,
     },
@@ -291,8 +307,10 @@ pub enum Channel {
     /// 合约网格订单（私有）
     #[serde(rename = "grid-orders-contract")]
     GridOrdersContract {
+        /// 算法订单 ID
         #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
         algo_id: Option<String>,
+        /// 产品 ID
         #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
         inst_id: Option<String>,
     },
@@ -300,8 +318,10 @@ pub enum Channel {
     /// 月亮网格订单（私有）
     #[serde(rename = "grid-orders-moon")]
     GridOrdersMoon {
+        /// 算法订单 ID
         #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
         algo_id: Option<String>,
+        /// 产品 ID
         #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
         inst_id: Option<String>,
     },
@@ -309,10 +329,13 @@ pub enum Channel {
     /// 网格仓位（私有）
     #[serde(rename = "grid-positions")]
     GridPositions {
+        /// 算法订单 ID
         #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
         algo_id: Option<String>,
+        /// 产品类型
         #[serde(rename = "instType", skip_serializing_if = "Option::is_none")]
         inst_type: Option<String>,
+        /// 产品 ID
         #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
         inst_id: Option<String>,
     },
@@ -320,8 +343,10 @@ pub enum Channel {
     /// 网格子订单（私有）
     #[serde(rename = "grid-sub-orders")]
     GridSubOrders {
+        /// 算法订单 ID
         #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
         algo_id: Option<String>,
+        /// 产品 ID
         #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
         inst_id: Option<String>,
     },
@@ -329,6 +354,7 @@ pub enum Channel {
     /// 定投订单（私有）
     #[serde(rename = "algo-recurring-buy")]
     AlgoRecurringBuy {
+        /// 算法订单 ID
         #[serde(rename = "algoId", skip_serializing_if = "Option::is_none")]
         algo_id: Option<String>,
     },

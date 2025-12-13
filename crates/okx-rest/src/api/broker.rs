@@ -9,7 +9,9 @@ use crate::OkxRestClient;
 
 /// 端点常量。
 pub mod endpoints {
+    /// 生成返佣明细下载链接端点。
     pub const FD_REBATE_PER_ORDERS: &str = "/api/v5/broker/fd/rebate-per-orders";
+    /// 获取返佣明细下载链接端点。
     pub const FD_GET_REBATE_PER_ORDERS: &str = "/api/v5/broker/fd/rebate-per-orders";
 }
 

@@ -469,22 +469,45 @@ pub struct GetPositionsHistoryParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBillsParams {
+    /// 产品类型
+    ///
+    /// 可选值:
+    /// - `SPOT`: 现货
+    /// - `MARGIN`: 杠杆
+    /// - `SWAP`: 永续合约
+    /// - `FUTURES`: 交割合约
+    /// - `OPTION`: 期权
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_type: Option<String>,
+    /// 币种，如 BTC、USDT
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 保证金模式
+    ///
+    /// 可选值:
+    /// - `cash`: 简单模式现货
+    /// - `cross`: 全仓
+    /// - `isolated`: 逐仓
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mgn_mode: Option<String>,
+    /// 合约类型
+    ///
+    /// 适用于交割/永续合约
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ct_type: Option<String>,
+    /// 账单类型
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
+    /// 账单子类型
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sub_type: Option<String>,
+    /// 分页参数，查询此 ID 之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 分页参数，查询此 ID 之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 返回记录数量限制，默认 100，最大 100
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
 }
@@ -493,26 +516,51 @@ pub struct GetBillsParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetBillsArchiveParams {
+    /// 产品类型
+    ///
+    /// 可选值:
+    /// - `SPOT`: 现货
+    /// - `MARGIN`: 杠杆
+    /// - `SWAP`: 永续合约
+    /// - `FUTURES`: 交割合约
+    /// - `OPTION`: 期权
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_type: Option<String>,
+    /// 币种，如 BTC、USDT
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 保证金模式
+    ///
+    /// 可选值:
+    /// - `cash`: 简单模式现货
+    /// - `cross`: 全仓
+    /// - `isolated`: 逐仓
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mgn_mode: Option<String>,
+    /// 合约类型
+    ///
+    /// 适用于交割/永续合约
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ct_type: Option<String>,
+    /// 账单类型
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
+    /// 账单子类型
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sub_type: Option<String>,
+    /// 分页参数，查询此 ID 之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 分页参数，查询此 ID 之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 返回记录数量限制，默认 100，最大 100
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
+    /// 查询起始时间，Unix 时间戳（毫秒）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub begin: Option<String>,
+    /// 查询结束时间，Unix 时间戳（毫秒）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end: Option<String>,
 }
@@ -521,16 +569,22 @@ pub struct GetBillsArchiveParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetInterestAccruedParams {
+    /// 产品 ID，如 BTC-USDT
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_id: Option<String>,
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 保证金模式，`cross`（全仓）或 `isolated`（逐仓）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mgn_mode: Option<String>,
+    /// 分页参数，查询此时间戳之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 分页参数，查询此时间戳之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 返回记录数量限制，默认 100，最大 100
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
 }
@@ -539,6 +593,7 @@ pub struct GetInterestAccruedParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetInterestRateParams {
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
 }
@@ -547,14 +602,19 @@ pub struct GetInterestRateParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetVipInterestParams {
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 订单 ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ord_id: Option<String>,
+    /// 分页参数，查询此 ID 之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 分页参数，查询此 ID 之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 返回记录数量限制
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
 }
@@ -580,9 +640,12 @@ pub struct GetSimulatedMarginParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetAccountPositionTiersParams {
+    /// 产品类型，如 `SWAP`、`FUTURES`、`OPTION`
     pub inst_type: String,
+    /// 标的指数，如 BTC-USD
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uly: Option<String>,
+    /// 交易品种，如 BTC-USD（适用于期权）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_family: Option<String>,
 }
@@ -591,6 +654,7 @@ pub struct GetAccountPositionTiersParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetGreeksParams {
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
 }
@@ -599,6 +663,7 @@ pub struct GetGreeksParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetMaxWithdrawalParams {
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
 }
@@ -607,16 +672,22 @@ pub struct GetMaxWithdrawalParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PositionBuilderRequest {
+    /// 账户级别
     #[serde(skip_serializing_if = "Option::is_none")]
     pub acct_lv: Option<String>,
+    /// 是否包含真实持仓和权益
     #[serde(skip_serializing_if = "Option::is_none")]
     pub incl_real_pos_and_eq: Option<bool>,
+    /// 杠杆倍数
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lever: Option<String>,
+    /// Greeks 类型，`PA`（币本位）或 `BS`（Black-Scholes）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub greeks_type: Option<String>,
+    /// 模拟持仓数据
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sim_pos: Option<Value>,
+    /// 模拟资产数据
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sim_asset: Option<Value>,
 }
@@ -625,6 +696,7 @@ pub struct PositionBuilderRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetGreeksRequest {
+    /// Greeks 展示类型，`PA`（币本位）或 `BS`（Black-Scholes）
     pub greeks_type: String,
 }
 
@@ -632,7 +704,9 @@ pub struct SetGreeksRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetIsolatedModeRequest {
+    /// 逐仓保证金模式，`automatic`（开仓自动划转）或 `autonomy`（自主划转）
     pub iso_mode: String,
+    /// 保证金类型，`MARGIN`（现货杠杆）或 `CONTRACTS`（合约）
     pub r#type: String,
 }
 
@@ -640,6 +714,7 @@ pub struct SetIsolatedModeRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetAccountLevelRequest {
+    /// 账户级别，`1`（简单模式）、`2`（单币种保证金）、`3`（跨币种保证金）、`4`（组合保证金）
     pub acct_lv: String,
 }
 
@@ -647,12 +722,16 @@ pub struct SetAccountLevelRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BorrowRepayRequest {
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 操作类型，`borrow`（借币）或 `repay`（还币）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub side: Option<String>,
+    /// 金额
     #[serde(skip_serializing_if = "Option::is_none")]
     pub amt: Option<String>,
+    /// 订单 ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ord_id: Option<String>,
 }
@@ -661,12 +740,16 @@ pub struct BorrowRepayRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BorrowRepayHistoryParams {
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 分页参数，查询此时间戳之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 分页参数，查询此时间戳之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 返回记录数量限制
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
 }
@@ -675,10 +758,13 @@ pub struct BorrowRepayHistoryParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpotManualBorrowRepayRequest {
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 操作类型，`borrow`（借币）或 `repay`（还币）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub side: Option<String>,
+    /// 金额
     #[serde(skip_serializing_if = "Option::is_none")]
     pub amt: Option<String>,
 }
@@ -687,14 +773,19 @@ pub struct SpotManualBorrowRepayRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpotBorrowRepayHistoryParams {
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 操作类型，`borrow`（借币）或 `repay`（还币）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
+    /// 分页参数，查询此时间戳之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 分页参数，查询此时间戳之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 返回记录数量限制
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
 }

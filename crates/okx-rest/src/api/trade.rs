@@ -232,28 +232,40 @@ pub type GetOrdersHistoryArchiveParams = GetOrdersHistoryParams;
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AmendAlgoOrderRequest {
+    /// 产品 ID，如 BTC-USDT
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_id: Option<String>,
+    /// 策略订单 ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub algo_id: Option<String>,
+    /// 客户自定义策略订单 ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub algo_cl_ord_id: Option<String>,
+    /// 失败时是否取消，`true` 或 `false`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cxl_on_fail: Option<String>,
+    /// 用户自定义请求 ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub req_id: Option<String>,
+    /// 新的委托数量
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_sz: Option<String>,
+    /// 新的止盈触发价格
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_tp_trigger_px: Option<String>,
+    /// 新的止盈委托价格
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_tp_ord_px: Option<String>,
+    /// 新的止损触发价格
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_sl_trigger_px: Option<String>,
+    /// 新的止损委托价格
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_sl_ord_px: Option<String>,
+    /// 新的止盈触发价格类型，`last`（最新价）、`index`（指数价）、`mark`（标记价）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_tp_trigger_px_type: Option<String>,
+    /// 新的止损触发价格类型，`last`（最新价）、`index`（指数价）、`mark`（标记价）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_sl_trigger_px_type: Option<String>,
 }
@@ -262,8 +274,10 @@ pub struct AmendAlgoOrderRequest {
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetAlgoOrderDetailsParams {
+    /// 策略订单 ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub algo_id: Option<String>,
+    /// 客户自定义策略订单 ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub algo_cl_ord_id: Option<String>,
 }
@@ -516,7 +530,9 @@ pub trait TradeApi {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OneClickRepayV2Request {
+    /// 待还负债币种
     pub debt_ccy: String,
+    /// 偿还币种列表
     pub repay_ccy_list: Vec<String>,
 }
 
@@ -524,10 +540,13 @@ pub struct OneClickRepayV2Request {
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OneClickRepayHistoryV2Params {
+    /// 分页参数，查询此时间戳之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 分页参数，查询此时间戳之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 返回记录数量限制
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
 }

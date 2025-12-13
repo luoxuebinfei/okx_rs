@@ -119,15 +119,21 @@ pub struct GetMarkPriceParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetDeliveryExerciseHistoryParams {
+    /// 产品类型，`FUTURES`（交割合约）或 `OPTION`（期权）
     pub inst_type: String,
+    /// 标的指数，如 BTC-USD
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uly: Option<String>,
+    /// 交易品种，如 BTC-USD（适用于期权）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_family: Option<String>,
+    /// 分页参数，查询此时间戳之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 分页参数，查询此时间戳之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 返回记录数量限制
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
 }
@@ -136,11 +142,15 @@ pub struct GetDeliveryExerciseHistoryParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetOpenInterestParams {
+    /// 产品类型，`SWAP`（永续合约）或 `FUTURES`（交割合约）或 `OPTION`（期权）
     pub inst_type: String,
+    /// 标的指数，如 BTC-USD
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uly: Option<String>,
+    /// 产品 ID，如 BTC-USDT-SWAP
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_id: Option<String>,
+    /// 交易品种，如 BTC-USD（适用于期权）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_family: Option<String>,
 }
@@ -149,16 +159,23 @@ pub struct GetOpenInterestParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetPositionTiersParams {
+    /// 产品类型，`MARGIN`、`SWAP`、`FUTURES`、`OPTION`
     pub inst_type: String,
+    /// 交易模式，`cross`（全仓）或 `isolated`（逐仓）
     pub td_mode: String,
+    /// 标的指数，如 BTC-USD
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uly: Option<String>,
+    /// 产品 ID，如 BTC-USDT
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_id: Option<String>,
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 档位，如 `1`、`2`、`3`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tier: Option<String>,
+    /// 交易品种，如 BTC-USD（适用于期权）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_family: Option<String>,
 }
@@ -167,6 +184,7 @@ pub struct GetPositionTiersParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetPriceLimitParams {
+    /// 产品 ID，如 BTC-USDT-SWAP
     #[serde(rename = "instId")]
     pub inst_id: String,
 }
@@ -175,10 +193,13 @@ pub struct GetPriceLimitParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetOptSummaryParams {
+    /// 标的指数，如 BTC-USD
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uly: Option<String>,
+    /// 到期时间，格式：YYMMDD，如 `250628`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exp_time: Option<String>,
+    /// 交易品种，如 BTC-USD
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_family: Option<String>,
 }
@@ -187,6 +208,7 @@ pub struct GetOptSummaryParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetEstimatedPriceParams {
+    /// 产品 ID，如 BTC-USDT-SWAP
     #[serde(rename = "instId")]
     pub inst_id: String,
 }
@@ -195,6 +217,7 @@ pub struct GetEstimatedPriceParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetDiscountQuotaParams {
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
 }
@@ -203,6 +226,7 @@ pub struct GetDiscountQuotaParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetUnderlyingParams {
+    /// 产品类型，`SWAP`、`FUTURES`、`OPTION`
     #[serde(rename = "instType", skip_serializing_if = "Option::is_none")]
     pub inst_type: Option<String>,
 }
@@ -211,20 +235,28 @@ pub struct GetUnderlyingParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetInsuranceFundParams {
+    /// 产品类型，`MARGIN`、`SWAP`、`FUTURES`、`OPTION`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_type: Option<String>,
+    /// 风险准备金类型，`all`（全部）、`liquidation_balance_deposit`（强平注入）、`bankruptcy_loss`（穿仓亏损）、`platform_revenue`（平台收入）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
+    /// 标的指数，如 BTC-USD
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uly: Option<String>,
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 分页参数，查询此时间戳之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 分页参数，查询此时间戳之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 返回记录数量限制
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
+    /// 交易品种，如 BTC-USD（适用于期权）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_family: Option<String>,
 }
@@ -233,14 +265,19 @@ pub struct GetInsuranceFundParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetConvertContractCoinParams {
+    /// 转换类型，`1`（币转张）或 `2`（张转币）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
+    /// 产品 ID，如 BTC-USD-SWAP
     #[serde(rename = "instId", skip_serializing_if = "Option::is_none")]
     pub inst_id: Option<String>,
+    /// 数量
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sz: Option<String>,
+    /// 委托价格
     #[serde(skip_serializing_if = "Option::is_none")]
     pub px: Option<String>,
+    /// 币种单位，`coin`（币）或 `usds`（U本位合约面值）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unit: Option<String>,
 }
@@ -256,7 +293,9 @@ pub struct SystemTime {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetInstrumentTickBandsParams {
+    /// 产品类型，当前仅支持 `OPTION`
     pub inst_type: String,
+    /// 交易品种，如 BTC-USD
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_family: Option<String>,
 }
@@ -265,10 +304,13 @@ pub struct GetInstrumentTickBandsParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetOptionTradesParams {
+    /// 产品 ID，如 BTC-USD-221230-40000-C
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_id: Option<String>,
+    /// 交易品种，如 BTC-USD
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inst_family: Option<String>,
+    /// 期权类型，`C`（看涨期权）或 `P`（看跌期权）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub opt_type: Option<String>,
 }

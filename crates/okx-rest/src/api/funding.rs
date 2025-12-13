@@ -165,9 +165,13 @@ pub struct GetTransferStateParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PurchaseRedemptRequest {
+    /// 币种，如 USDT
     pub ccy: String,
+    /// 申购/赎回数量
     pub amt: String,
+    /// 操作类型，`purchase`（申购）或 `redempt`（赎回）
     pub side: String,
+    /// 利率，申购时可选
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate: Option<String>,
 }
@@ -176,14 +180,19 @@ pub struct PurchaseRedemptRequest {
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetFundingBillsParams {
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 账单类型
     #[serde(skip_serializing_if = "Option::is_none")]
     pub r#type: Option<String>,
+    /// 分页参数，查询此 ID 之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 分页参数，查询此 ID 之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 返回记录数量限制
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
 }
@@ -192,8 +201,11 @@ pub struct GetFundingBillsParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetDepositLightningParams {
+    /// 币种，如 BTC
     pub ccy: String,
+    /// 充值数量
     pub amt: String,
+    /// 收款账户类型，`6`（资金账户）或 `18`（交易账户）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
 }
@@ -202,8 +214,11 @@ pub struct GetDepositLightningParams {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WithdrawalLightningRequest {
+    /// 币种，如 BTC
     pub ccy: String,
+    /// 闪电网络 invoice
     pub invoice: String,
+    /// 备注
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memo: Option<String>,
 }
@@ -212,7 +227,9 @@ pub struct WithdrawalLightningRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetLendingRateRequest {
+    /// 币种，如 USDT
     pub ccy: String,
+    /// 利率，年化利率（0-365%）
     pub rate: String,
 }
 
@@ -220,12 +237,16 @@ pub struct SetLendingRateRequest {
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetLendingHistoryParams {
+    /// 币种，如 USDT
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 分页参数，查询此时间戳之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 分页参数，查询此时间戳之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 返回记录数量限制
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
 }
@@ -234,12 +255,16 @@ pub struct GetLendingHistoryParams {
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetLendingRateHistoryParams {
+    /// 币种，如 USDT
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 分页参数，查询此时间戳之后的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
+    /// 分页参数，查询此时间戳之前的记录
     #[serde(skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// 返回记录数量限制
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<String>,
 }
@@ -248,6 +273,7 @@ pub struct GetLendingRateHistoryParams {
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetLendingRateSummaryParams {
+    /// 币种，如 USDT
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
 }
@@ -255,6 +281,7 @@ pub struct GetLendingRateSummaryParams {
 /// Query parameters for asset valuation.
 #[derive(Debug, Default, Serialize)]
 pub struct GetAssetValuationParams {
+    /// 币种，如 BTC，多个币种用逗号分隔
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
 }
@@ -263,6 +290,7 @@ pub struct GetAssetValuationParams {
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CancelWithdrawalParams {
+    /// 提币申请 ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wd_id: Option<String>,
 }
@@ -271,6 +299,7 @@ pub struct CancelWithdrawalParams {
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConvertDustAssetsRequest {
+    /// 币种列表
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<Vec<String>>,
 }
@@ -278,6 +307,7 @@ pub struct ConvertDustAssetsRequest {
 /// Query parameters for saving balance.
 #[derive(Debug, Default, Serialize)]
 pub struct GetSavingBalanceParams {
+    /// 币种，如 USDT
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
 }
@@ -286,14 +316,19 @@ pub struct GetSavingBalanceParams {
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetDepositWithdrawStatusParams {
+    /// 提币申请 ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wd_id: Option<String>,
+    /// 区块转账哈希记录 ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tx_id: Option<String>,
+    /// 币种，如 BTC
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ccy: Option<String>,
+    /// 充值地址
     #[serde(skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
+    /// 币种链信息，如 `BTC-Bitcoin`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chain: Option<String>,
 }
