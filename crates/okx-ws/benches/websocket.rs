@@ -5,7 +5,6 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use okx_ws::{Channel, WsMessage};
-use serde_json;
 
 fn bench_message_parsing(c: &mut Criterion) {
     // 测试 Ticker 消息解析
@@ -36,7 +35,7 @@ fn bench_message_parsing(c: &mut Criterion) {
 
     c.bench_function("parse_ticker_message", |b| {
         b.iter(|| {
-            let _: WsMessage = serde_json::from_str(black_box(ticker_msg)).unwrap();
+            let _ = WsMessage::parse(black_box(ticker_msg));
         })
     });
 
@@ -63,7 +62,7 @@ fn bench_message_parsing(c: &mut Criterion) {
 
     c.bench_function("parse_orderbook_message", |b| {
         b.iter(|| {
-            let _: WsMessage = serde_json::from_str(black_box(book_msg)).unwrap();
+            let _ = WsMessage::parse(black_box(book_msg));
         })
     });
 
@@ -85,7 +84,7 @@ fn bench_message_parsing(c: &mut Criterion) {
 
     c.bench_function("parse_trade_message", |b| {
         b.iter(|| {
-            let _: WsMessage = serde_json::from_str(black_box(trade_msg)).unwrap();
+            let _ = WsMessage::parse(black_box(trade_msg));
         })
     });
 
@@ -100,7 +99,7 @@ fn bench_message_parsing(c: &mut Criterion) {
 
     c.bench_function("parse_event_message", |b| {
         b.iter(|| {
-            let _: WsMessage = serde_json::from_str(black_box(event_msg)).unwrap();
+            let _ = WsMessage::parse(black_box(event_msg));
         })
     });
 
@@ -113,7 +112,7 @@ fn bench_message_parsing(c: &mut Criterion) {
 
     c.bench_function("parse_error_message", |b| {
         b.iter(|| {
-            let _: WsMessage = serde_json::from_str(black_box(error_msg)).unwrap();
+            let _ = WsMessage::parse(black_box(error_msg));
         })
     });
 }

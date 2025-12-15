@@ -21,3 +21,9 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+criterion = "0.5"
+serde_json = { workspace = true }
+
+[[bench]]
+name = "websocket"
+harness = false

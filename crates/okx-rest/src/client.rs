@@ -354,6 +354,7 @@ impl OkxRestClient {
 }
 
 #[cfg(test)]
+#[allow(clippy::type_complexity)]
 mod tests {
     use super::*;
 
@@ -392,10 +393,15 @@ mod tests {
         body: Option<String>,
     }
 
+    /// 简化复杂类型，避免 clippy::type_complexity 警告
+    type FakeResponse = Result<(StatusCode, String)>;
+    type ResponseQueue = Arc<Mutex<VecDeque<FakeResponse>>>;
+    type RequestLog = Arc<Mutex<Vec<RecordedRequest>>>;
+
     #[derive(Clone, Default)]
     struct FakeTransport {
-        responses: Arc<Mutex<VecDeque<Result<(StatusCode, String)>>>>,
-        requests: Arc<Mutex<Vec<RecordedRequest>>>,
+        responses: ResponseQueue,
+        requests: RequestLog,
     }
 
     impl FakeTransport {
