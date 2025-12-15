@@ -52,6 +52,7 @@ jobs:
       - name: 降级不兼容 MSRV 的依赖
         run: |
           cargo update url --precise 2.5.4
+          cargo update idna_adapter --precise 1.1.0
 
       - name: 检查 MSRV 兼容性
         run: cargo check --workspace --exclude okx-py --all-features

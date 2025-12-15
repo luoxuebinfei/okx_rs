@@ -553,7 +553,8 @@ mod tests {
             current_delay: Duration::from_millis(1),
         };
 
-        let err = timeout(Duration::from_secs(2), client.do_reconnect())
+        // Windows TCP 连接超时较长（约 21 秒），需要足够的超时时间
+        let err = timeout(Duration::from_secs(30), client.do_reconnect())
             .await
             .expect("重连流程超时")
             .expect_err("应达到最大重连次数并失败");
@@ -797,7 +798,8 @@ mod tests {
             current_delay: Duration::from_millis(1),
         };
 
-        let err = timeout(Duration::from_secs(2), client.reconnect())
+        // Windows TCP 连接超时较长（约 21 秒），需要足够的超时时间
+        let err = timeout(Duration::from_secs(30), client.reconnect())
             .await
             .expect("重连流程超时")
             .expect_err("应达到最大重连次数并失败");
