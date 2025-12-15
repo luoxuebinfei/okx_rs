@@ -47,20 +47,20 @@ okx_rs/
 
 # 默认：REST + WebSocket
 [dependencies]
-okx = { git = "https://github.com/user/okx_rs" }
+okx = { git = "https://github.com/luoxuebinfei/okx_rs" }
 
 # 仅 REST API
-okx = { git = "https://github.com/user/okx_rs", default-features = false, features = ["rest"] }
+okx = { git = "https://github.com/luoxuebinfei/okx_rs", default-features = false, features = ["rest"] }
 
 # 仅 WebSocket API
-okx = { git = "https://github.com/user/okx_rs", default-features = false, features = ["ws"] }
+okx = { git = "https://github.com/luoxuebinfei/okx_rs", default-features = false, features = ["ws"] }
 ```
 
 **直接依赖子 crate（高级用法）**
 
 ```toml
-okx-rest = { git = "https://github.com/user/okx_rs" }
-okx-ws = { git = "https://github.com/user/okx_rs" }
+okx-rest = { git = "https://github.com/luoxuebinfei/okx_rs" }
+okx-ws = { git = "https://github.com/luoxuebinfei/okx_rs" }
 ```
 
 **本地开发**

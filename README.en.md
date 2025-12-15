@@ -47,20 +47,20 @@ okx_rs/
 
 # Default: REST + WebSocket
 [dependencies]
-okx = { git = "https://github.com/user/okx_rs" }
+okx = { git = "https://github.com/luoxuebinfei/okx_rs" }
 
 # REST API only
-okx = { git = "https://github.com/user/okx_rs", default-features = false, features = ["rest"] }
+okx = { git = "https://github.com/luoxuebinfei/okx_rs", default-features = false, features = ["rest"] }
 
 # WebSocket API only
-okx = { git = "https://github.com/user/okx_rs", default-features = false, features = ["ws"] }
+okx = { git = "https://github.com/luoxuebinfei/okx_rs", default-features = false, features = ["ws"] }
 ```
 
 **Direct sub-crate dependency (advanced)**
 
 ```toml
-okx-rest = { git = "https://github.com/user/okx_rs" }
-okx-ws = { git = "https://github.com/user/okx_rs" }
+okx-rest = { git = "https://github.com/luoxuebinfei/okx_rs" }
+okx-ws = { git = "https://github.com/luoxuebinfei/okx_rs" }
 ```
 
 **Local development**
