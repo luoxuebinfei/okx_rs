@@ -39,27 +39,27 @@ fmt:
 # 构建 Python 绑定
 py-build:
     mkdir -p .uv-cache .cache
-    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation --no-sync maturin develop
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation maturin develop
 
 # 运行 Python 测试
 py-test: py-build
-    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation --no-sync pytest tests/ -v
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation pytest tests/ -v
 
 # 运行 Python 测试（详细模式）
 py-test-verbose: py-build
-    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation --no-sync pytest tests/ -vv -s
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation pytest tests/ -vv -s
 
 # 运行特定的 Python 测试文件
 py-test-file FILE: py-build
-    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation --no-sync pytest tests/{{FILE}} -v
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation pytest tests/{{FILE}} -v
 
 # 运行 Python 类型检查
 py-typecheck:
-    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation --no-sync mypy python/okx_py
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache uv run --no-build-isolation mypy python/okx_py
 
 # 校验 Python 类型存根与运行时一致性（需要先执行 `just py-setup` 安装 dev 依赖）
 py-stubtest: py-build
-    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache MYPYPATH=python uv run --no-build-isolation --no-sync python -m mypy.stubtest okx_py.okx_py
+    cd crates/okx-py && UV_CACHE_DIR=../../.uv-cache XDG_CACHE_HOME=../../.cache MYPYPATH=python uv run --no-build-isolation python -m mypy.stubtest okx_py.okx_py
 
 # 清理构建产物
 clean:

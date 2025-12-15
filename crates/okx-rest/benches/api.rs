@@ -4,8 +4,7 @@
 #![allow(missing_docs)]
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use okx_core::types::{Balance, Instrument, Order, Ticker};
-use serde_json;
+use okx_core::types::{Balance, Instrument, Order, PlaceOrderRequest, Ticker};
 
 fn bench_deserialization(c: &mut Criterion) {
     // 测试 Ticker 反序列化
@@ -167,9 +166,7 @@ fn bench_deserialization(c: &mut Criterion) {
 }
 
 fn bench_serialization(c: &mut Criterion) {
-    use okx_rest::api::trade::PlaceOrderParams;
-
-    let order_params = PlaceOrderParams {
+    let order_params = PlaceOrderRequest {
         inst_id: "BTC-USDT".to_string(),
         td_mode: "cash".to_string(),
         side: "buy".to_string(),
@@ -182,7 +179,6 @@ fn bench_serialization(c: &mut Criterion) {
         pos_side: None,
         reduce_only: None,
         tgt_ccy: None,
-        ban_amend: None,
         tp_trigger_px: None,
         tp_trigger_px_type: None,
         tp_ord_px: None,
@@ -190,7 +186,7 @@ fn bench_serialization(c: &mut Criterion) {
         sl_trigger_px_type: None,
         sl_ord_px: None,
         stp_id: None,
-        stpmode: None,
+        stp_mode: None,
         quick_mgn_type: None,
         attach_algo_ords: None,
     };
