@@ -48,5 +48,6 @@ pub use api::trade::TradeApi;
 pub use api::trading_data::TradingDataApi;
 pub use client::OkxRestClient;
 
-// Re-export core types for convenience
-pub use okx_core::*;
+// Re-export core types for standalone usage
+// When using the unified `okx` crate, these are already available
+pub use okx_core::{Config, Credentials, OkxError, Result};

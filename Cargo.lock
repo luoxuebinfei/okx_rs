@@ -892,6 +892,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "okx"
+version = "0.1.0"
+dependencies = [
+ "okx-core",
+ "okx-rest",
+ "okx-ws",
+]
+
+[[package]]
 name = "okx-core"
 version = "0.1.0"
 dependencies = [

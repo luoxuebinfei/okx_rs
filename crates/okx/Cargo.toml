@@ -1,0 +1,21 @@
+[package]
+name = "okx"
+version = "0.1.0"
+edition = "2021"
+description = "OKX Exchange API client for Rust"
+readme = "../../README.en.md"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/user/okx_rs"
+keywords = ["okx", "exchange", "api", "trading", "crypto"]
+categories = ["api-bindings", "asynchronous"]
+
+[features]
+default = ["rest", "ws"]
+full = ["rest", "ws"]
+rest = ["dep:okx-rest"]
+ws = ["dep:okx-ws"]
+
+[dependencies]
+okx-core = { path = "../okx-core" }
+okx-rest = { path = "../okx-rest", optional = true }
+okx-ws = { path = "../okx-ws", optional = true }

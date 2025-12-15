@@ -1,10 +1,10 @@
-# okx_rs · OKX Rust SDK & Python bindings
+# okx_rs · OKX Rust SDK & Python Bindings
 
-> 简体中文见 [README.md](README.md)
+> Chinese version: [README.md](README.md)
 
 ## Overview
 - High-performance OKX REST/WebSocket SDK in Rust; all paths/params follow the official docs (https://www.okx.com/docs-v5/) and mirror the official `python-okx` behavior.
-- Workspace layout: `okx-core` (config/signing/types), `okx-rest` (REST client), `okx-ws` (WebSocket client), `okx-py` (PyO3 bindings with sync/async/WS).
+- Workspace layout: `okx` (unified entry), `okx-core` (config/signing/types), `okx-rest` (REST client), `okx-ws` (WebSocket client), `okx-py` (PyO3 bindings with sync/async/WS).
 - Built-in signing, timeout, proxy, WS heartbeat and auto-reconnect; supports production and demo trading.
 - Detailed API/type notes live in `docs/en/rust-api.md` and `docs/en/python.md` (Chinese versions in `docs/zh/`).
 
@@ -13,14 +13,20 @@
 - **Stability**: Tokio async + reqwest pooling; WS auto-reconnect with subscription restore (`ReconnectingWsClient`).
 - **Type safety**: Strict request/response structs (`Balance`, `Order`, etc.) matching official field names; unified `OkxError`.
 - **Cross-language**: PyO3 bindings expose sync/async REST and WS clients with `.pyi` stubs.
-- **Official signing**: HMAC-SHA256 of `timestamp + method + requestPath + body` (see `okx-core::signer`, sourced from the official “REST Authentication” section).
+- **Official signing**: HMAC-SHA256 of `timestamp + method + requestPath + body` (see `okx-core::signer`, sourced from the official "REST Authentication" section).
+- **Advanced API Extensions**: Broker rebates, Spread trading, Rubik trading data, Block/RFQ operations (including MMP), WS advanced channels (block/advanced algo/grid/recurring) with Python sync/async bindings.
 
-## Modules
-- `crates/okx-core`: `Config`, `Credentials`, `Signer`, `OkxError`, constants, and all shared types.
-- `crates/okx-rest`: `OkxRestClient` plus `AccountApi` / `TradeApi` / `FundingApi` / `MarketApi` / `PublicApi`.
-- `crates/okx-ws`: `WsClient` (basic) and `ReconnectingWsClient` (auto-reconnect), `Channel`/`WsMessage`.
-- `crates/okx-py`: PyO3 bindings (`OkxClient`, `AsyncOkxClient`, `WsClient`) and exported types.
-- `justfile`: unified scripts (fmt, clippy, test, py-test, typecheck, ci, coverage).
+## Module Structure
+```
+okx_rs/
+├── crates/
+│   ├── okx/           # Unified entry crate (recommended)
+│   ├── okx-core/      # Config, Credentials, Signer, OkxError, constants & types
+│   ├── okx-rest/      # OkxRestClient + AccountApi/TradeApi/FundingApi/MarketApi/PublicApi
+│   ├── okx-ws/        # WsClient (basic) and ReconnectingWsClient (auto-reconnect)
+│   └── okx-py/        # Python clients (OkxClient, AsyncOkxClient, WsClient)
+└── justfile           # Unified scripts (fmt/clippy/test/py-test/typecheck/ci/cov)
+```
 
 ## API Coverage (from official docs)
 - Account: balance `/api/v5/account/balance`, positions `/positions`, leverage `/set-leverage`, fee rates `/trade-fee`, max size `/max-size`, max available `/max-avail-size`, risk `/account-position-risk`, etc.
@@ -31,46 +37,75 @@
 - WebSocket channels: tickers/books/books5/books50-l2-tbt/books-l2-tbt/trades/candle(1m/5m/15m/1H/4H/1D)/mark-price/index-tickers/funding-rate; private account/positions/orders/orders-algo/balance_and_position.
 
 ## Installation
-Rust:
-- In workspace: `cargo build --all` or `just build`.
-- As dependency: not yet on crates.io; use path/git, e.g., `cargo add okx-rest --path crates/okx-rest` or `--git https://github.com/user/okx_rs`.
 
-Python (Python 3.9+, recommended `uv` + `maturin`):
+### Rust
+
+**Recommended: Use unified `okx` crate**
+
+```toml
+# Cargo.toml
+
+# Default: REST + WebSocket
+[dependencies]
+okx = { git = "https://github.com/user/okx_rs" }
+
+# REST API only
+okx = { git = "https://github.com/user/okx_rs", default-features = false, features = ["rest"] }
+
+# WebSocket API only
+okx = { git = "https://github.com/user/okx_rs", default-features = false, features = ["ws"] }
+```
+
+**Direct sub-crate dependency (advanced)**
+
+```toml
+okx-rest = { git = "https://github.com/user/okx_rs" }
+okx-ws = { git = "https://github.com/user/okx_rs" }
+```
+
+**Local development**
+
+```bash
+cargo build --all  # or just build
+```
+
+### Python (Python 3.9+, recommended `uv` + `maturin`)
+
 ```bash
 just py-setup      # create .venv and install deps
 just py-build      # maturin develop installs okx-py
 ```
 
-## Quickstart (Rust REST)
+## Quick Start (Rust REST)
+
 ```rust
-use okx_rest::{OkxRestClient, AccountApi, MarketApi};
-use okx_core::{Config, Credentials};
+use okx::prelude::*;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let creds = Credentials::new("api_key", "secret_key", "passphrase");
     let config = Config::new(creds).simulated(true).with_timeout_secs(10);
-    let client = OkxRestClient::new(config);
+    let client = RestClient::new(config);
 
     // Public API
-    let ticker = client.get_ticker("BTC-USDT").await?;
+    let ticker = client.market().get_ticker("BTC-USDT").await?;
 
     // Private API (requires valid keys)
-    let balance = client.get_balance(None).await?;
+    let balance = client.account().get_balance(None).await?;
 
     println!("ticker={ticker:?} balance={balance:?}");
     Ok(())
 }
 ```
 
-## Quickstart (Rust WebSocket)
+## Quick Start (Rust WebSocket)
+
 ```rust
-use okx_ws::{Channel, WsClient, WsMessage};
-use okx_core::{Config, Credentials};
+use okx::prelude::*;
 use futures_util::StreamExt;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let creds = Credentials::new("api_key", "secret_key", "passphrase");
     let config = Config::new(creds).simulated(true);
     let mut client = WsClient::connect_public(&config).await?;
@@ -90,7 +125,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## Quick Start (Auto-reconnect WebSocket)
+
+```rust
+use okx::{ws::ReconnectingWsClient, prelude::*};
+use okx::ws::{ConnectionType, ReconnectConfig};
+use futures_util::StreamExt;
+
+#[tokio::main]
+async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let config = Config::new(Credentials::new("key", "secret", "pass"));
+    let reconnect_cfg = ReconnectConfig::default().with_max_attempts(10);
+
+    let mut client = ReconnectingWsClient::connect(
+        config,
+        ConnectionType::Public,
+        reconnect_cfg,
+    ).await?;
+
+    client.subscribe(vec![Channel::Tickers { inst_id: "BTC-USDT".into() }]).await?;
+
+    while let Some(msg) = client.next().await {
+        // Subscriptions are automatically restored after reconnection
+        println!("{msg:?}");
+    }
+    Ok(())
+}
+```
+
 ## Python Examples
+
 Sync:
 ```python
 from okx_py import OkxClient, Config, Credentials
@@ -101,6 +165,7 @@ client = OkxClient(cfg)
 print(client.get_ticker("BTC-USDT"))
 print(client.get_balance())
 ```
+
 Async:
 ```python
 import asyncio
@@ -117,6 +182,7 @@ async def main():
 
 asyncio.run(main())
 ```
+
 See `crates/okx-py/examples/` for more.
 
 ## Configuration Notes
