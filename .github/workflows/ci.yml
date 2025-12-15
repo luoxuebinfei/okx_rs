@@ -12,7 +12,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
-  # 快速检查：格式、Clippy、MSRV（并行运行，快速失败）
+  # 快速检查：格式、Clippy（快速失败）
   check:
     name: 检查
     runs-on: ubuntu-latest
@@ -32,6 +32,7 @@ jobs:
         run: cargo clippy --workspace --exclude okx-py --all-targets --all-features -- -D warnings
 
   # MSRV 检查（与 check 并行）
+  # Cargo.lock 已提交，确保依赖版本兼容 MSRV
   msrv:
     name: MSRV (1.75)
     runs-on: ubuntu-latest
