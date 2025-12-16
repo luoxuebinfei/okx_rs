@@ -105,7 +105,7 @@ mod tests {
 
         // Should be approximately 5 seconds ahead (allow 1 second tolerance)
         let diff = offset_secs - local_secs;
-        assert!(diff >= 4 && diff <= 6, "diff was {diff}");
+        assert!((4..=6).contains(&diff), "diff was {diff}");
     }
 
     #[test]
@@ -118,6 +118,6 @@ mod tests {
         let offset_secs = provider.timestamp_unix_secs();
 
         let diff = local_secs - offset_secs;
-        assert!(diff >= 2 && diff <= 4, "diff was {diff}");
+        assert!((2..=4).contains(&diff), "diff was {diff}");
     }
 }
