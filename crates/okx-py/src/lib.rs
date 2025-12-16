@@ -45,7 +45,20 @@
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
+use pyo3::{create_exception, import_exception};
 use serde_json::Value;
+
+// 导入 Python 内置异常
+import_exception!(builtins, ConnectionError);
+
+// 自定义 OKX 异常层次结构
+create_exception!(okx_py, OkxError, pyo3::exceptions::PyException);
+create_exception!(okx_py, OkxHttpError, OkxError);
+create_exception!(okx_py, OkxRateLimitError, OkxHttpError);
+create_exception!(okx_py, OkxApiError, OkxError);
+create_exception!(okx_py, OkxAuthError, OkxError);
+create_exception!(okx_py, OkxWebSocketError, OkxError);
+create_exception!(okx_py, OkxTimeoutError, OkxError);
 
 mod account;
 mod async_client;
@@ -59,14 +72,18 @@ mod funding;
 mod grid;
 mod public;
 mod raw;
+mod response_meta;
 mod spread;
 mod subaccount;
+mod time_sync;
 mod trading_data;
 mod types;
 mod ws_client;
 
 use async_client::*;
 use client::*;
+use response_meta::*;
+use time_sync::*;
 use types::*;
 use ws_client::*;
 
@@ -74,6 +91,15 @@ use ws_client::*;
 #[pymodule]
 fn okx_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+
+    // 异常类型
+    m.add("OkxError", m.py().get_type::<OkxError>())?;
+    m.add("OkxHttpError", m.py().get_type::<OkxHttpError>())?;
+    m.add("OkxRateLimitError", m.py().get_type::<OkxRateLimitError>())?;
+    m.add("OkxApiError", m.py().get_type::<OkxApiError>())?;
+    m.add("OkxAuthError", m.py().get_type::<OkxAuthError>())?;
+    m.add("OkxWebSocketError", m.py().get_type::<OkxWebSocketError>())?;
+    m.add("OkxTimeoutError", m.py().get_type::<OkxTimeoutError>())?;
 
     // Core types
     m.add_class::<PyCredentials>()?;
@@ -86,6 +112,12 @@ fn okx_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // WebSocket client
     m.add_class::<PyWsClient>()?;
 
+    // Time synchronization
+    m.add_class::<PyTimeSync>()?;
+
+    // Response metadata
+    m.add_class::<PyResponseMeta>()?;
+
     // Data types
     m.add_class::<PyBalance>()?;
     m.add_class::<PyBalanceDetail>()?;
@@ -97,8 +129,33 @@ fn okx_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 /// Convert OKX error to Python exception.
+///
+/// 根据错误类型返回对应的 Python 异常：
+/// - `HttpStatus` 429 -> `OkxRateLimitError`
+/// - `HttpStatus` 其他 -> `OkxHttpError`
+/// - `Api` -> `OkxApiError`
+/// - `Auth` -> `OkxAuthError`
+/// - `WebSocket` / `ConnectionClosed` -> `OkxWebSocketError`
+/// - `Timeout` -> `OkxTimeoutError`
+/// - 其他 -> `OkxError`
 fn to_py_err(e: okx_core::OkxError) -> PyErr {
-    PyRuntimeError::new_err(e.to_string())
+    use okx_core::OkxError as E;
+    match e {
+        E::HttpStatus { status, ref body } => {
+            let msg = format!("HTTP {status}: {body}");
+            if status == 429 {
+                OkxRateLimitError::new_err(msg)
+            } else {
+                OkxHttpError::new_err(msg)
+            }
+        }
+        E::Api { ref code, ref msg } => OkxApiError::new_err(format!("API error [{code}]: {msg}")),
+        E::Auth(ref msg) => OkxAuthError::new_err(msg.clone()),
+        E::WebSocket(ref msg) => OkxWebSocketError::new_err(msg.clone()),
+        E::ConnectionClosed => OkxWebSocketError::new_err("Connection closed"),
+        E::Timeout => OkxTimeoutError::new_err("Request timeout"),
+        _ => OkxError::new_err(e.to_string()),
+    }
 }
 
 /// 将 `serde_json::Value` 列表转换为 Python 对象列表。

@@ -7,8 +7,10 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use tokio::sync::Mutex;
 
+use okx_core::TimestampProvider;
 use okx_ws::{Channel, ConnectionType, ReconnectConfig, ReconnectingWsClient, WsMessage};
 
+use crate::time_sync::PyTimeSync;
 use crate::to_py_err;
 use crate::types::PyConfig;
 
@@ -738,6 +740,66 @@ impl PyWsClient {
         })
     }
 
+    /// Login to the private WebSocket with an external Unix timestamp.
+    ///
+    /// This method allows using a server-synchronized timestamp instead of local time,
+    /// which is useful when there's clock drift between client and server.
+    ///
+    /// Args:
+    ///     timestamp_unix: Unix timestamp in seconds (as string, e.g., "1700000000")
+    ///
+    /// Raises:
+    ///     OkxWebSocketError: If the connection is closed
+    fn login_with_timestamp<'py>(
+        &self,
+        py: Python<'py>,
+        timestamp_unix: String,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client
+                .lock()
+                .await
+                .login_with_timestamp(&timestamp_unix)
+                .await
+                .map_err(to_py_err)
+        })
+    }
+
+    /// Set the timestamp provider for login during reconnection.
+    ///
+    /// When set, the provider will be used to get timestamps for login
+    /// after automatic reconnection, ensuring consistent time synchronization.
+    ///
+    /// Args:
+    ///     time_sync: A TimeSync instance to use as timestamp provider
+    ///
+    /// Example:
+    ///     >>> time_sync = TimeSync(config)
+    ///     >>> await time_sync.sync()
+    ///     >>> client.set_timestamp_provider(time_sync)
+    fn set_timestamp_provider<'py>(
+        &self,
+        py: Python<'py>,
+        time_sync: &PyTimeSync,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        let provider: Arc<dyn TimestampProvider> = time_sync.inner.clone();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client.lock().await.set_timestamp_provider(provider);
+            Ok(())
+        })
+    }
+
+    /// Clear the timestamp provider (will use local time for login during reconnection).
+    fn clear_timestamp_provider<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let client = Arc::clone(&self.client);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            client.lock().await.clear_timestamp_provider();
+            Ok(())
+        })
+    }
+
     /// Close the WebSocket connection.
     fn close<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let client = Arc::clone(&self.client);
@@ -808,6 +870,22 @@ fn ws_message_to_py(py: Python<'_>, msg: WsMessage) -> PyResult<Py<PyAny>> {
         }
         WsMessage::Pong => {
             dict.set_item("type", "pong")?;
+        }
+        WsMessage::ChannelConnCount {
+            channel,
+            conn_count,
+            conn_id,
+        } => {
+            dict.set_item("type", "channel_conn_count")?;
+            dict.set_item("channel", channel)?;
+            dict.set_item("connCount", conn_count)?;
+            dict.set_item("connId", conn_id)?;
+        }
+        WsMessage::ChannelConnCountError { channel, code, msg } => {
+            dict.set_item("type", "channel_conn_count_error")?;
+            dict.set_item("channel", channel)?;
+            dict.set_item("code", code)?;
+            dict.set_item("msg", msg)?;
         }
         WsMessage::Unknown(text) => {
             dict.set_item("type", "unknown")?;
@@ -975,6 +1053,100 @@ mod tests {
                     .extract::<String>()
                     .unwrap(),
                 raw
+            );
+        });
+    }
+
+    #[test]
+    fn ws_message_to_py_maps_channel_conn_count() {
+        Python::attach(|py| {
+            let msg = WsMessage::ChannelConnCount {
+                channel: "tickers".to_string(),
+                conn_count: 5,
+                conn_id: "conn-123".to_string(),
+            };
+
+            let obj = ws_message_to_py(py, msg).expect("转换成功");
+            let dict = obj.bind(py).cast::<PyDict>().expect("应为字典");
+
+            assert_eq!(
+                dict.get_item("type")
+                    .expect("读取 type 失败")
+                    .expect("需包含 type")
+                    .extract::<String>()
+                    .unwrap(),
+                "channel_conn_count"
+            );
+            assert_eq!(
+                dict.get_item("channel")
+                    .expect("读取 channel 失败")
+                    .expect("需包含 channel")
+                    .extract::<String>()
+                    .unwrap(),
+                "tickers"
+            );
+            assert_eq!(
+                dict.get_item("connCount")
+                    .expect("读取 connCount 失败")
+                    .expect("需包含 connCount")
+                    .extract::<u32>()
+                    .unwrap(),
+                5
+            );
+            assert_eq!(
+                dict.get_item("connId")
+                    .expect("读取 connId 失败")
+                    .expect("需包含 connId")
+                    .extract::<String>()
+                    .unwrap(),
+                "conn-123"
+            );
+        });
+    }
+
+    #[test]
+    fn ws_message_to_py_maps_channel_conn_count_error() {
+        Python::attach(|py| {
+            let msg = WsMessage::ChannelConnCountError {
+                channel: "orders".to_string(),
+                code: "60001".to_string(),
+                msg: "Invalid channel".to_string(),
+            };
+
+            let obj = ws_message_to_py(py, msg).expect("转换成功");
+            let dict = obj.bind(py).cast::<PyDict>().expect("应为字典");
+
+            assert_eq!(
+                dict.get_item("type")
+                    .expect("读取 type 失败")
+                    .expect("需包含 type")
+                    .extract::<String>()
+                    .unwrap(),
+                "channel_conn_count_error"
+            );
+            assert_eq!(
+                dict.get_item("channel")
+                    .expect("读取 channel 失败")
+                    .expect("需包含 channel")
+                    .extract::<String>()
+                    .unwrap(),
+                "orders"
+            );
+            assert_eq!(
+                dict.get_item("code")
+                    .expect("读取 code 失败")
+                    .expect("需包含 code")
+                    .extract::<String>()
+                    .unwrap(),
+                "60001"
+            );
+            assert_eq!(
+                dict.get_item("msg")
+                    .expect("读取 msg 失败")
+                    .expect("需包含 msg")
+                    .extract::<String>()
+                    .unwrap(),
+                "Invalid channel"
             );
         });
     }

@@ -66,6 +66,7 @@ okx-ws = { git = "https://github.com/luoxuebinfei/okx_rs" }
 **Local development**
 
 ```bash
+just setup         # Run once after cloning to install cargo-nextest and other dev tools
 cargo build --all  # or just build
 ```
 

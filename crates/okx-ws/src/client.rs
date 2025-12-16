@@ -100,6 +100,36 @@ where
     ///
     /// Must be called before subscribing to private channels.
     pub async fn login(&mut self) -> Result<()> {
+        let signer = Signer::new(self.config.credentials().clone());
+        let (api_key, passphrase, timestamp, sign) = signer.generate_ws_login_params();
+        self.login_with_params(&api_key, &passphrase, &timestamp, &sign)
+            .await
+    }
+
+    /// Login to the private WebSocket with an external Unix timestamp.
+    ///
+    /// This method allows using a server-synchronized timestamp instead of local time,
+    /// which is useful when there's clock drift between client and server.
+    ///
+    /// ## Arguments
+    ///
+    /// * `timestamp_unix` - Unix timestamp in seconds (as string)
+    pub async fn login_with_timestamp(&mut self, timestamp_unix: &str) -> Result<()> {
+        let signer = Signer::new(self.config.credentials().clone());
+        let (api_key, passphrase, timestamp, sign) =
+            signer.generate_ws_login_params_with_timestamp(timestamp_unix);
+        self.login_with_params(&api_key, &passphrase, &timestamp, &sign)
+            .await
+    }
+
+    /// Internal login implementation with pre-computed parameters.
+    async fn login_with_params(
+        &mut self,
+        api_key: &str,
+        passphrase: &str,
+        timestamp: &str,
+        sign: &str,
+    ) -> Result<()> {
         if !self.is_private {
             return Err(OkxError::Auth(
                 "Cannot login on public WebSocket connection".to_string(),
@@ -111,10 +141,7 @@ where
             return Ok(());
         }
 
-        let signer = Signer::new(self.config.credentials().clone());
-        let (api_key, passphrase, timestamp, sign) = signer.generate_ws_login_params();
-
-        let request = WsRequest::login(&api_key, &passphrase, &timestamp, &sign);
+        let request = WsRequest::login(api_key, passphrase, timestamp, sign);
         self.send_request(&request).await?;
 
         // Wait for login response
@@ -326,6 +353,18 @@ impl WsClient {
     /// Must be called before subscribing to private channels.
     pub async fn login(&mut self) -> Result<()> {
         self.inner.login().await
+    }
+
+    /// Login to the private WebSocket with an external Unix timestamp.
+    ///
+    /// This method allows using a server-synchronized timestamp instead of local time,
+    /// which is useful when there's clock drift between client and server.
+    ///
+    /// ## Arguments
+    ///
+    /// * `timestamp_unix` - Unix timestamp in seconds (as string)
+    pub async fn login_with_timestamp(&mut self, timestamp_unix: &str) -> Result<()> {
+        self.inner.login_with_timestamp(timestamp_unix).await
     }
 
     /// Subscribe to channels.

@@ -3,7 +3,7 @@
 //! 参考：官方 Python SDK 的组织方式
 //! - <https://github.com/okxapi/python-okx>
 
-use std::{future::Future, pin::Pin, time::Duration};
+use std::{collections::HashMap, future::Future, pin::Pin, time::Duration};
 
 use reqwest::{Client, Method, Proxy, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
@@ -12,7 +12,11 @@ use tracing::{debug, instrument};
 
 use okx_core::{types::ApiResponse, Config, OkxError, Result, Signer};
 
-type TransportFuture = Pin<Box<dyn Future<Output = Result<(StatusCode, String)>> + Send>>;
+use crate::ResponseMeta;
+
+/// Transport response: (status, body, headers)
+type TransportResponse = (StatusCode, String, HashMap<String, String>);
+type TransportFuture = Pin<Box<dyn Future<Output = Result<TransportResponse>> + Send>>;
 
 /// HTTP 传输层抽象（便于在无网络/受限环境中做纯内存测试）。
 trait HttpTransport: Clone + Send + Sync + 'static {
@@ -56,12 +60,24 @@ impl HttpTransport for ReqwestTransport {
                 .map_err(|e| OkxError::Http(e.to_string()))?;
 
             let status = response.status();
+
+            // Extract headers
+            let resp_headers: HashMap<String, String> = response
+                .headers()
+                .iter()
+                .filter_map(|(k, v)| {
+                    v.to_str()
+                        .ok()
+                        .map(|val| (k.as_str().to_lowercase(), val.to_string()))
+                })
+                .collect();
+
             let text = response
                 .text()
                 .await
                 .map_err(|e| OkxError::Http(format!("Failed to read response: {e}")))?;
 
-            Ok((status, text))
+            Ok((status, text, resp_headers))
         })
     }
 }
@@ -94,7 +110,7 @@ impl<T: HttpTransport> OkxRestClientInner<T> {
         headers: Vec<(&'static str, String)>,
         body: Option<String>,
     ) -> Result<Vec<TOut>> {
-        let (status, text) = self.transport.send(method, url, headers, body).await?;
+        let (status, text, _) = self.transport.send(method, url, headers, body).await?;
         debug!("Response status={} body={}", status, text);
         self.parse_body(status, &text)
     }
@@ -106,9 +122,38 @@ impl<T: HttpTransport> OkxRestClientInner<T> {
         headers: Vec<(&'static str, String)>,
         body: Option<String>,
     ) -> Result<Value> {
-        let (status, text) = self.transport.send(method, url, headers, body).await?;
+        let (status, text, _) = self.transport.send(method, url, headers, body).await?;
         debug!("Raw response status={} body={}", status, text);
         self.parse_body_raw(status, &text)
+    }
+
+    async fn send_and_parse_with_meta<TOut: DeserializeOwned>(
+        &self,
+        method: Method,
+        url: String,
+        headers: Vec<(&'static str, String)>,
+        body: Option<String>,
+    ) -> Result<(Vec<TOut>, ResponseMeta)> {
+        let (status, text, resp_headers) = self.transport.send(method, url, headers, body).await?;
+        debug!("Response status={} body={}", status, text);
+        let meta = ResponseMeta::new(status.as_u16(), resp_headers);
+        let data = self.parse_body(status, &text)?;
+        Ok((data, meta))
+    }
+
+    #[allow(dead_code)] // 保留供将来使用
+    async fn send_and_parse_raw_with_meta(
+        &self,
+        method: Method,
+        url: String,
+        headers: Vec<(&'static str, String)>,
+        body: Option<String>,
+    ) -> Result<(Value, ResponseMeta)> {
+        let (status, text, resp_headers) = self.transport.send(method, url, headers, body).await?;
+        debug!("Raw response status={} body={}", status, text);
+        let meta = ResponseMeta::new(status.as_u16(), resp_headers);
+        let data = self.parse_body_raw(status, &text)?;
+        Ok((data, meta))
     }
 
     fn build_url<P: Serialize + ?Sized>(&self, path: &str, params: Option<&P>) -> Result<String> {
@@ -140,10 +185,7 @@ impl<T: HttpTransport> OkxRestClientInner<T> {
         text: &str,
     ) -> Result<Vec<TOut>> {
         if !status.is_success() {
-            return Err(OkxError::Http(format!(
-                "HTTP error: status={}, body={}",
-                status, text
-            )));
+            return Err(OkxError::http_status(status.as_u16(), text));
         }
 
         let api_response: ApiResponse<TOut> = serde_json::from_str(text)?;
@@ -156,10 +198,7 @@ impl<T: HttpTransport> OkxRestClientInner<T> {
 
     fn parse_body_raw(&self, status: StatusCode, text: &str) -> Result<Value> {
         if !status.is_success() {
-            return Err(OkxError::Http(format!(
-                "HTTP error: status={}, body={}",
-                status, text
-            )));
+            return Err(OkxError::http_status(status.as_u16(), text));
         }
 
         Ok(serde_json::from_str(text)?)
@@ -186,6 +225,23 @@ impl<T: HttpTransport> OkxRestClientInner<T> {
 
         let headers = Signer::generate_public_headers(self.config.is_simulated());
         self.send_and_parse_raw(Method::GET, url, headers, None)
+            .await
+    }
+
+    async fn get_public_with_meta<TOut, P>(
+        &self,
+        path: &str,
+        params: Option<&P>,
+    ) -> Result<(Vec<TOut>, ResponseMeta)>
+    where
+        TOut: DeserializeOwned,
+        P: Serialize + ?Sized,
+    {
+        let url = self.build_url(path, params)?;
+        debug!("GET (public with meta) {}", url);
+
+        let headers = Signer::generate_public_headers(self.config.is_simulated());
+        self.send_and_parse_with_meta(Method::GET, url, headers, None)
             .await
     }
 
@@ -219,6 +275,26 @@ impl<T: HttpTransport> OkxRestClientInner<T> {
             .await
     }
 
+    async fn get_with_meta<TOut, P>(
+        &self,
+        path: &str,
+        params: Option<&P>,
+    ) -> Result<(Vec<TOut>, ResponseMeta)>
+    where
+        TOut: DeserializeOwned,
+        P: Serialize + ?Sized,
+    {
+        let url = self.build_url(path, params)?;
+        let request_path = self.extract_request_path(&url);
+        debug!("GET (private with meta) {}", url);
+
+        let headers =
+            self.signer
+                .generate_headers("GET", &request_path, "", self.config.is_simulated());
+        self.send_and_parse_with_meta(Method::GET, url, headers, None)
+            .await
+    }
+
     async fn post<TOut, B>(&self, path: &str, body: &B) -> Result<Vec<TOut>>
     where
         TOut: DeserializeOwned,
@@ -247,6 +323,30 @@ impl<T: HttpTransport> OkxRestClientInner<T> {
             self.signer
                 .generate_headers("POST", path, &body_str, self.config.is_simulated());
         self.send_and_parse_raw(Method::POST, url, headers, Some(body_str))
+            .await
+    }
+
+    async fn post_with_meta<TOut, B>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<(Vec<TOut>, ResponseMeta)>
+    where
+        TOut: DeserializeOwned,
+        B: Serialize + ?Sized,
+    {
+        let url = self.build_url::<()>(path, None)?;
+        let request_path = self.extract_request_path(&url);
+        let body_str = serde_json::to_string(body)?;
+        debug!("POST (private with meta) {} body={}", url, body_str);
+
+        let headers = self.signer.generate_headers(
+            "POST",
+            &request_path,
+            &body_str,
+            self.config.is_simulated(),
+        );
+        self.send_and_parse_with_meta(Method::POST, url, headers, Some(body_str))
             .await
     }
 }
@@ -351,6 +451,51 @@ impl OkxRestClient {
     {
         self.inner.post_raw(path, body).await
     }
+
+    /// 公有 GET（带响应元数据）。
+    ///
+    /// 返回数据和响应元数据（包含 HTTP 状态码和响应头）。
+    /// 适用于需要读取限速信息的场景。
+    #[instrument(skip(self, params), fields(path = %path))]
+    pub async fn get_public_with_meta<TOut, P>(
+        &self,
+        path: &str,
+        params: Option<&P>,
+    ) -> Result<(Vec<TOut>, ResponseMeta)>
+    where
+        TOut: DeserializeOwned,
+        P: Serialize + ?Sized,
+    {
+        self.inner.get_public_with_meta(path, params).await
+    }
+
+    /// 私有 GET（带响应元数据，签名）。
+    #[instrument(skip(self, params), fields(path = %path))]
+    pub async fn get_with_meta<TOut, P>(
+        &self,
+        path: &str,
+        params: Option<&P>,
+    ) -> Result<(Vec<TOut>, ResponseMeta)>
+    where
+        TOut: DeserializeOwned,
+        P: Serialize + ?Sized,
+    {
+        self.inner.get_with_meta(path, params).await
+    }
+
+    /// 私有 POST（带响应元数据，签名）。
+    #[instrument(skip(self, body), fields(path = %path))]
+    pub async fn post_with_meta<TOut, B>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<(Vec<TOut>, ResponseMeta)>
+    where
+        TOut: DeserializeOwned,
+        B: Serialize + ?Sized,
+    {
+        self.inner.post_with_meta(path, body).await
+    }
 }
 
 #[cfg(test)]
@@ -394,7 +539,7 @@ mod tests {
     }
 
     /// 简化复杂类型，避免 clippy::type_complexity 警告
-    type FakeResponse = Result<(StatusCode, String)>;
+    type FakeResponse = Result<TransportResponse>;
     type ResponseQueue = Arc<Mutex<VecDeque<FakeResponse>>>;
     type RequestLog = Arc<Mutex<Vec<RecordedRequest>>>;
 
@@ -409,7 +554,7 @@ mod tests {
             self.responses
                 .lock()
                 .expect("锁 responses 失败")
-                .push_back(Ok((status, body.into())));
+                .push_back(Ok((status, body.into(), HashMap::new())));
         }
 
         fn push_err(&self, err: OkxError) {
@@ -622,7 +767,22 @@ mod tests {
             .get_public::<DummyData, ()>("/api/v5/mock", None)
             .await
             .expect_err("HTTP 非 2xx 应返回错误");
-        assert!(matches!(err, OkxError::Http(_)));
+        assert!(matches!(err, OkxError::HttpStatus { status: 500, .. }));
+        assert!(err.is_http_status(500));
+    }
+
+    #[tokio::test]
+    async fn http_429_is_rate_limited() {
+        let transport = FakeTransport::default();
+        transport.push_ok(StatusCode::TOO_MANY_REQUESTS, "rate limited");
+
+        let client = inner_client_with_base("https://example.com", transport);
+        let err = client
+            .get_public::<DummyData, ()>("/api/v5/mock", None)
+            .await
+            .expect_err("HTTP 429 应返回错误");
+        assert!(err.is_rate_limited());
+        assert!(err.is_http_status(429));
     }
 
     #[test]

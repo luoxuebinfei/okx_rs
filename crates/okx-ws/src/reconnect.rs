@@ -4,6 +4,7 @@
 
 use std::collections::HashSet;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -11,7 +12,7 @@ use futures_util::Stream;
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
-use okx_core::{Config, OkxError, Result};
+use okx_core::{Config, OkxError, Result, TimestampProvider};
 
 use crate::channel::Channel;
 use crate::client::WsClient;
@@ -166,6 +167,8 @@ pub struct ReconnectingWsClient {
     attempt_count: u32,
     /// Current backoff delay
     current_delay: Duration,
+    /// Optional timestamp provider for login during reconnection
+    timestamp_provider: Option<Arc<dyn TimestampProvider>>,
 }
 
 /// Key for tracking subscriptions (serialized channel).
@@ -203,7 +206,74 @@ impl ReconnectingWsClient {
             subscriptions: HashSet::new(),
             attempt_count: 0,
             current_delay: initial_delay,
+            timestamp_provider: None,
         })
+    }
+
+    /// Connect with a custom timestamp provider for login during reconnection.
+    ///
+    /// The timestamp provider will be used when logging in after reconnection,
+    /// ensuring consistent time synchronization even when there's clock drift.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,ignore
+    /// use okx_ws::{ReconnectingWsClient, ReconnectConfig, ConnectionType};
+    /// use okx_rest::TimeSync;
+    /// use okx_core::{Config, Credentials};
+    /// use std::sync::Arc;
+    ///
+    /// async fn example() -> okx_core::Result<()> {
+    ///     let credentials = Credentials::new("key", "secret", "pass");
+    ///     let config = Config::new(credentials).simulated(true);
+    ///
+    ///     // Create TimeSync and sync with server
+    ///     let rest_client = okx_rest::OkxRestClient::new(config.clone());
+    ///     let time_sync = Arc::new(TimeSync::new(rest_client));
+    ///     time_sync.sync().await?;
+    ///
+    ///     // Use TimeSync as timestamp provider for reconnection
+    ///     let mut client = ReconnectingWsClient::connect_with_timestamp_provider(
+    ///         config,
+    ///         ConnectionType::Private,
+    ///         ReconnectConfig::default(),
+    ///         time_sync,
+    ///     ).await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn connect_with_timestamp_provider(
+        config: Config,
+        conn_type: ConnectionType,
+        reconnect_config: ReconnectConfig,
+        timestamp_provider: Arc<dyn TimestampProvider>,
+    ) -> Result<Self> {
+        let client = Self::create_client(&config, conn_type).await?;
+
+        let initial_delay = reconnect_config.initial_delay;
+        Ok(Self {
+            client: Some(client),
+            config,
+            conn_type,
+            reconnect_config,
+            state: ConnectionState::Connected,
+            subscriptions: HashSet::new(),
+            attempt_count: 0,
+            current_delay: initial_delay,
+            timestamp_provider: Some(timestamp_provider),
+        })
+    }
+
+    /// Set the timestamp provider for login during reconnection.
+    ///
+    /// Can be called after connection to add or change the timestamp provider.
+    pub fn set_timestamp_provider(&mut self, provider: Arc<dyn TimestampProvider>) {
+        self.timestamp_provider = Some(provider);
+    }
+
+    /// Clear the timestamp provider (will use local time for login).
+    pub fn clear_timestamp_provider(&mut self) {
+        self.timestamp_provider = None;
     }
 
     /// Get the current connection state.
@@ -273,6 +343,22 @@ impl ReconnectingWsClient {
         }
         self.client = None;
         Ok(())
+    }
+
+    /// Login to the private WebSocket with an external Unix timestamp.
+    ///
+    /// This method allows using a server-synchronized timestamp instead of local time,
+    /// which is useful when there's clock drift between client and server.
+    ///
+    /// ## Arguments
+    ///
+    /// * `timestamp_unix` - Unix timestamp in seconds (as string)
+    pub async fn login_with_timestamp(&mut self, timestamp_unix: &str) -> Result<()> {
+        if let Some(client) = &mut self.client {
+            client.login_with_timestamp(timestamp_unix).await
+        } else {
+            Err(OkxError::ConnectionClosed)
+        }
     }
 
     /// Manually trigger a reconnection.
@@ -365,7 +451,14 @@ impl ReconnectingWsClient {
         // For private connections, login first
         if self.conn_type == ConnectionType::Private {
             if let Some(client) = &mut self.client {
-                client.login().await?;
+                // Use timestamp provider if available, otherwise use local time
+                if let Some(provider) = &self.timestamp_provider {
+                    let timestamp = provider.timestamp_unix_secs().to_string();
+                    debug!("Logging in with timestamp provider: {}", timestamp);
+                    client.login_with_timestamp(&timestamp).await?;
+                } else {
+                    client.login().await?;
+                }
             }
         }
 
@@ -495,6 +588,7 @@ mod tests {
             subscriptions: HashSet::new(),
             attempt_count: 1,
             current_delay: Duration::from_secs(2),
+            timestamp_provider: None,
         };
 
         assert_eq!(client.state(), ConnectionState::Disconnected);
@@ -551,6 +645,7 @@ mod tests {
             subscriptions: HashSet::new(),
             attempt_count: 0,
             current_delay: Duration::from_millis(1),
+            timestamp_provider: None,
         };
 
         // Windows TCP 连接超时较长（约 21 秒），需要足够的超时时间
@@ -578,6 +673,7 @@ mod tests {
             subscriptions: HashSet::new(),
             attempt_count: 0,
             current_delay: Duration::from_millis(1),
+            timestamp_provider: None,
         };
 
         // 空订阅应直接返回 Ok
@@ -607,6 +703,7 @@ mod tests {
             subscriptions: HashSet::new(),
             attempt_count: 0,
             current_delay: Duration::from_millis(1),
+            timestamp_provider: None,
         };
 
         client
@@ -639,6 +736,7 @@ mod tests {
             subscriptions: HashSet::new(),
             attempt_count: 0,
             current_delay: Duration::from_millis(1),
+            timestamp_provider: None,
         };
 
         let err = client.ping().await.expect_err("无连接时 ping 应失败");
@@ -660,6 +758,7 @@ mod tests {
             subscriptions: HashSet::new(),
             attempt_count: 0,
             current_delay: Duration::from_millis(1),
+            timestamp_provider: None,
         };
 
         assert!(client.next().await.is_none());
@@ -678,6 +777,7 @@ mod tests {
             subscriptions: HashSet::new(),
             attempt_count: 0,
             current_delay: Duration::from_millis(1),
+            timestamp_provider: None,
         };
 
         let waker = futures_util::task::noop_waker_ref();
@@ -745,6 +845,7 @@ mod tests {
             subscriptions: HashSet::new(),
             attempt_count: 0,
             current_delay: Duration::from_millis(1),
+            timestamp_provider: None,
         };
 
         client.close().await.expect("close 应返回 Ok");
@@ -765,6 +866,7 @@ mod tests {
             subscriptions: HashSet::new(),
             attempt_count: 0,
             current_delay: Duration::from_millis(1),
+            timestamp_provider: None,
         };
 
         let waker = futures_util::task::noop_waker_ref();
@@ -772,6 +874,37 @@ mod tests {
         let polled = Pin::new(&mut client).poll_next(&mut cx);
         assert!(matches!(polled, Poll::Pending));
         assert_eq!(client.state(), ConnectionState::Reconnecting);
+    }
+
+    #[test]
+    fn test_set_and_clear_timestamp_provider() {
+        use okx_core::LocalTimeProvider;
+
+        let cfg = Config::new(Credentials::new("k", "s", "p"));
+        let reconnect_config = ReconnectConfig::default();
+        let mut client = ReconnectingWsClient {
+            client: None,
+            config: cfg,
+            conn_type: ConnectionType::Private,
+            reconnect_config,
+            state: ConnectionState::Connected,
+            subscriptions: HashSet::new(),
+            attempt_count: 0,
+            current_delay: Duration::from_millis(1),
+            timestamp_provider: None,
+        };
+
+        // Initially no provider
+        assert!(client.timestamp_provider.is_none());
+
+        // Set provider
+        let provider = Arc::new(LocalTimeProvider);
+        client.set_timestamp_provider(provider);
+        assert!(client.timestamp_provider.is_some());
+
+        // Clear provider
+        client.clear_timestamp_provider();
+        assert!(client.timestamp_provider.is_none());
     }
 
     #[tokio::test]
@@ -796,6 +929,7 @@ mod tests {
             subscriptions: HashSet::new(),
             attempt_count: 0,
             current_delay: Duration::from_millis(1),
+            timestamp_provider: None,
         };
 
         // Windows TCP 连接超时较长（约 21 秒），需要足够的超时时间

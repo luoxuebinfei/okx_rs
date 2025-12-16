@@ -50,6 +50,7 @@ fn dummy_client() -> OkxRestClient {
 fn expect_http_error(err: OkxError) -> String {
     match err {
         OkxError::Http(msg) => msg,
+        OkxError::HttpStatus { status, body } => format!("HTTP {status}: {body}"),
         other => panic!("预期 HTTP 错误，实际为: {other:?}"),
     }
 }

@@ -126,7 +126,35 @@ impl Signer {
         simulated: bool,
     ) -> Vec<(&'static str, String)> {
         let timestamp = Self::timestamp();
-        let pre_hash = Self::pre_hash(&timestamp, method, request_path, body);
+        self.generate_headers_with_timestamp(&timestamp, method, request_path, body, simulated)
+    }
+
+    /// Generate authentication headers with an external timestamp.
+    ///
+    /// This method allows using a server-synchronized timestamp instead of local time,
+    /// which is useful when there's clock drift between client and server.
+    ///
+    /// ## Arguments
+    ///
+    /// * `timestamp_iso` - ISO 8601 formatted timestamp (e.g., `2024-01-01T12:00:00.000Z`)
+    /// * `method` - HTTP method
+    /// * `request_path` - Request path including query string
+    /// * `body` - Request body
+    /// * `simulated` - Whether to use simulated trading
+    ///
+    /// ## Returns
+    ///
+    /// A vector of (`header_name`, `header_value`) pairs.
+    #[must_use]
+    pub fn generate_headers_with_timestamp(
+        &self,
+        timestamp_iso: &str,
+        method: &str,
+        request_path: &str,
+        body: &str,
+        simulated: bool,
+    ) -> Vec<(&'static str, String)> {
+        let pre_hash = Self::pre_hash(timestamp_iso, method, request_path, body);
         let signature = Self::sign(&pre_hash, self.credentials.secret_key());
 
         let mut headers = vec![
@@ -136,7 +164,7 @@ impl Signer {
                 self.credentials.api_key().to_string(),
             ),
             (headers::OK_ACCESS_SIGN, signature),
-            (headers::OK_ACCESS_TIMESTAMP, timestamp),
+            (headers::OK_ACCESS_TIMESTAMP, timestamp_iso.to_string()),
             (
                 headers::OK_ACCESS_PASSPHRASE,
                 self.credentials.passphrase().to_string(),
@@ -176,13 +204,32 @@ impl Signer {
     #[must_use]
     pub fn generate_ws_login_params(&self) -> (String, String, String, String) {
         let timestamp = Utc::now().timestamp().to_string();
-        let message = format!("{timestamp}GET/users/self/verify");
+        self.generate_ws_login_params_with_timestamp(&timestamp)
+    }
+
+    /// Generate login parameters for WebSocket authentication with an external timestamp.
+    ///
+    /// This method allows using a server-synchronized timestamp instead of local time.
+    ///
+    /// ## Arguments
+    ///
+    /// * `timestamp_unix` - Unix timestamp in seconds (as string)
+    ///
+    /// ## Returns
+    ///
+    /// A tuple of (`api_key`, `passphrase`, `timestamp`, `sign`)
+    #[must_use]
+    pub fn generate_ws_login_params_with_timestamp(
+        &self,
+        timestamp_unix: &str,
+    ) -> (String, String, String, String) {
+        let message = format!("{timestamp_unix}GET/users/self/verify");
         let signature = Self::sign(&message, self.credentials.secret_key());
 
         (
             self.credentials.api_key().to_string(),
             self.credentials.passphrase().to_string(),
-            timestamp,
+            timestamp_unix.to_string(),
             signature,
         )
     }
@@ -262,6 +309,24 @@ mod tests {
         let headers_live = signer.generate_headers("post", "/api/v5/unit", body, false);
         let map_live: HashMap<_, _> = headers_live.into_iter().collect();
         assert!(!map_live.contains_key(headers::X_SIMULATED_TRADING));
+    }
+
+    #[test]
+    fn generate_headers_with_timestamp_uses_provided_timestamp() {
+        let signer = Signer::new(Credentials::new("api", "secret", "pass"));
+        let body = r#"{"k":1}"#;
+        let custom_ts = "2024-06-15T12:30:45.123Z";
+        let headers =
+            signer.generate_headers_with_timestamp(custom_ts, "POST", "/api/v5/unit", body, false);
+        let map: HashMap<_, _> = headers.into_iter().collect();
+
+        // Verify the custom timestamp is used
+        assert_eq!(map[headers::OK_ACCESS_TIMESTAMP], custom_ts);
+
+        // Verify signature is computed with the custom timestamp
+        let pre_hash = Signer::pre_hash(custom_ts, "POST", "/api/v5/unit", body);
+        let expected_sign = Signer::sign(&pre_hash, "secret");
+        assert_eq!(map[headers::OK_ACCESS_SIGN], expected_sign);
     }
 
     #[test]

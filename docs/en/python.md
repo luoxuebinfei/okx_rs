@@ -15,6 +15,30 @@ See `docs/en/release.md` for PyPI publishing steps.
 - `Config(credentials, simulated=False, timeout_secs=30, proxy_url=None, rest_url=None, ws_public_url=None, ws_private_url=None)` maps to `okx-core::Config`.
 - Domain objects are converted from Rust `okx-core::types` (e.g., `Balance`, `Position`, `Order`, `Ticker`), preserving official camelCase field names.
 
+## Exception types
+The SDK provides a hierarchy of exception types for fine-grained error handling:
+- `OkxError`: Base class for all OKX-related exceptions
+- `OkxHttpError`: HTTP response errors (non-2xx status codes)
+- `OkxRateLimitError`: HTTP 429 rate limit errors (inherits from `OkxHttpError`)
+- `OkxApiError`: OKX API business errors (code != 0)
+- `OkxAuthError`: Authentication errors
+- `OkxWebSocketError`: WebSocket connection errors
+- `OkxTimeoutError`: Request timeout errors
+
+Example:
+```python
+from okx_py import OkxClient, OkxRateLimitError, OkxApiError
+
+try:
+    client.place_order(...)
+except OkxRateLimitError:
+    # Handle rate limiting, wait and retry
+    time.sleep(1)
+except OkxApiError as e:
+    # Handle business errors
+    print(f"API error: {e}")
+```
+
 ## Sync REST client `OkxClient`
 Source: `crates/okx-py/src/client.rs`. Returns Python objects/dicts and maps to official REST paths:
 - `get_balance(ccy=None)` → `/api/v5/account/balance`
@@ -72,8 +96,9 @@ Source: `crates/okx-py/src/ws_client.rs`, built atop `ReconnectingWsClient` (aut
   - `subscribe_account(ccy=None)` (account)
   - `subscribe_positions(inst_type, inst_id=None)` (positions)
   - `subscribe_orders(inst_type, inst_id=None)` (orders)
-- Receive: `await client.recv()` returns a dict (type=data/event/pong/unknown); also supports `async for msg in client`.
+- Receive: `await client.recv()` returns a dict (type=data/event/pong/channel_conn_count/channel_conn_count_error/unknown); also supports `async for msg in client`.
 - State: `is_connected()`, `reconnect()`, `close()`, `subscription_count()`.
+- External timestamp login: `login_with_timestamp(timestamp_unix)` - Login to private WebSocket using a server-synchronized timestamp, useful when there's clock drift between client and server.
 
 ## WebSocket exposed subs
 | Purpose | Channel | Python call |

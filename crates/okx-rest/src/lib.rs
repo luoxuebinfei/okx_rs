@@ -30,6 +30,11 @@
 
 pub mod api;
 mod client;
+mod response_meta;
+mod time_sync;
+
+pub use response_meta::ResponseMeta;
+pub use time_sync::{TimeSync, TimeSyncHandle};
 
 pub use api::account::AccountApi;
 pub use api::block_rfq::BlockRfqApi;

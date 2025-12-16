@@ -33,6 +33,24 @@ pub enum WsMessage {
     },
     /// Pong response
     Pong,
+    /// Channel connection count information
+    ChannelConnCount {
+        /// Channel name
+        channel: String,
+        /// Number of connections
+        conn_count: u32,
+        /// Connection ID
+        conn_id: String,
+    },
+    /// Channel connection count error
+    ChannelConnCountError {
+        /// Channel name
+        channel: String,
+        /// Error code
+        code: String,
+        /// Error message
+        msg: String,
+    },
     /// Unknown message
     Unknown(String),
 }
@@ -78,6 +96,50 @@ impl WsMessage {
 
         // Check if it's an event message
         if let Some(event) = value.get("event").and_then(|e| e.as_str()) {
+            // Handle channel-conn-count event
+            if event == "channel-conn-count" {
+                let channel = value
+                    .get("channel")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let conn_count = value
+                    .get("connCount")
+                    .and_then(|c| c.as_str())
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0);
+                let conn_id = value
+                    .get("connId")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                return Self::ChannelConnCount {
+                    channel,
+                    conn_count,
+                    conn_id,
+                };
+            }
+
+            // Handle channel-conn-count-error event
+            if event == "channel-conn-count-error" {
+                let channel = value
+                    .get("channel")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let code = value
+                    .get("code")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let msg = value
+                    .get("msg")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                return Self::ChannelConnCountError { channel, code, msg };
+            }
+
             let ws_event = match event {
                 "subscribe" => WsEvent::Subscribe,
                 "unsubscribe" => WsEvent::Unsubscribe,
@@ -296,5 +358,37 @@ mod tests {
         // 未知 event 也走 Unknown
         let msg = WsMessage::parse(r#"{"event":"weird"}"#);
         assert!(matches!(msg, WsMessage::Unknown(_)));
+    }
+
+    #[test]
+    fn parse_channel_conn_count_event() {
+        let json = r#"{"event":"channel-conn-count","channel":"orders","connCount":"5","connId":"abc123"}"#;
+        let msg = WsMessage::parse(json);
+        match msg {
+            WsMessage::ChannelConnCount {
+                channel,
+                conn_count,
+                conn_id,
+            } => {
+                assert_eq!(channel, "orders");
+                assert_eq!(conn_count, 5);
+                assert_eq!(conn_id, "abc123");
+            }
+            other => panic!("应解析为 ChannelConnCount，实际为: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_channel_conn_count_error_event() {
+        let json = r#"{"event":"channel-conn-count-error","channel":"orders","code":"60001","msg":"invalid"}"#;
+        let msg = WsMessage::parse(json);
+        match msg {
+            WsMessage::ChannelConnCountError { channel, code, msg } => {
+                assert_eq!(channel, "orders");
+                assert_eq!(code, "60001");
+                assert_eq!(msg, "invalid");
+            }
+            other => panic!("应解析为 ChannelConnCountError，实际为: {other:?}"),
+        }
     }
 }

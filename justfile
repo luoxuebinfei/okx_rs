@@ -8,21 +8,28 @@
 default:
     @just --list
 
+# 初始化开发环境（安装必要工具）
+setup:
+    @echo "安装 Rust 开发工具..."
+    cargo install cargo-nextest --locked
+    cargo install cargo-llvm-cov --locked
+    @echo "开发环境初始化完成！"
+
 # 构建所有 crate
 build:
     cargo build --all
 
 # 运行所有 Rust 测试（包括集成测试，可能需要网络连接）
 test:
-    cargo test --workspace
+    cargo nextest run --workspace
 
 # 仅运行单元测试（快速，无网络请求，推荐用于 WSL）
 test-unit:
-    cargo test --workspace --lib
+    cargo nextest run --workspace --lib
 
 # 运行集成测试（需要网络连接）
 test-integration:
-    cargo test --workspace --test '*'
+    cargo nextest run --workspace --test '*'
 
 # 检查代码（快速）
 check:

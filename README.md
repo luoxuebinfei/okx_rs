@@ -66,6 +66,7 @@ okx-ws = { git = "https://github.com/luoxuebinfei/okx_rs" }
 **本地开发**
 
 ```bash
+just setup         # 首次克隆后执行，安装 cargo-nextest 等开发工具
 cargo build --all  # 或 just build
 ```
 

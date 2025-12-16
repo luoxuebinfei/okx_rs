@@ -40,6 +40,7 @@ TBD - created by archiving change add-okx-rust-sdk. Update Purpose after archive
 - 最大重试次数配置
 - 重连间隔配置
 - 订阅状态恢复
+- 时间戳提供者复用
 
 #### Scenario: 连接断开后自动重连
 - **WHEN** WebSocket 连接意外断开
@@ -56,7 +57,10 @@ TBD - created by archiving change add-okx-rust-sdk. Update Purpose after archive
 - **THEN** 系统触发错误回调
 - **AND** 停止重连尝试
 
----
+#### Scenario: 重连时复用时间戳提供者
+- **WHEN** 配置了 `TimestampProvider` 且发生重连
+- **THEN** 重新登录时使用同一 provider
+- **AND** 保证时间源一致性
 
 ### Requirement: WebSocket 认证
 
@@ -67,6 +71,10 @@ TBD - created by archiving change add-okx-rust-sdk. Update Purpose after archive
 2. 发送 login 操作请求
 3. 验证登录响应
 
+系统 SHALL 支持外部时间戳注入：
+- 可配置 `TimestampProvider` 用于生成登录时间戳
+- 默认使用本机时间（向后兼容）
+
 #### Scenario: 私有频道登录成功
 - **WHEN** 发送正确的登录凭证
 - **THEN** 系统收到登录成功响应
@@ -76,6 +84,11 @@ TBD - created by archiving change add-okx-rust-sdk. Update Purpose after archive
 - **WHEN** 发送无效的登录凭证
 - **THEN** 系统收到登录失败响应
 - **AND** 返回 `OkxError::Auth`
+
+#### Scenario: 使用外部时间戳登录
+- **WHEN** 配置了 `TimestampProvider`
+- **THEN** 登录签名使用 provider 提供的 Unix 秒时间戳
+- **AND** 不使用本机时间
 
 ---
 
@@ -181,4 +194,26 @@ TBD - created by archiving change add-okx-rust-sdk. Update Purpose after archive
 - **WHEN** 收到错误推送
 - **THEN** 系统解析错误码和错误消息
 - **AND** 触发错误处理逻辑
+
+### Requirement: 频道连接数消息
+
+系统 SHALL 解析 `channel-conn-count` 和 `channel-conn-count-error` 事件为结构化消息。
+
+WsMessage SHALL 新增以下变体：
+- `ChannelConnCount`: 频道连接数信息
+- `ChannelConnCountError`: 频道连接数错误
+
+#### Scenario: 解析 channel-conn-count 事件
+- **WHEN** 收到 `{"event": "channel-conn-count", "channel": "orders", "connCount": "5", "connId": "abc123"}`
+- **THEN** 返回 `WsMessage::ChannelConnCount { channel: "orders", conn_count: 5, conn_id: "abc123" }`
+
+#### Scenario: 解析 channel-conn-count-error 事件
+- **WHEN** 收到 `{"event": "channel-conn-count-error", "channel": "orders", "code": "60001", "msg": "..."}`
+- **THEN** 返回 `WsMessage::ChannelConnCountError { channel: "orders", code: "60001", msg: "..." }`
+
+#### Scenario: 未知事件仍进入 Unknown
+- **WHEN** 收到未识别的事件类型
+- **THEN** 返回 `WsMessage::Unknown`（保持现有行为）
+
+---
 

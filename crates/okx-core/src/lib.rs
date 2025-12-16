@@ -26,9 +26,12 @@
 mod config;
 mod credentials;
 mod error;
+mod time_provider;
 
 pub mod signer;
 pub mod types;
+
+pub use time_provider::{LocalTimeProvider, OffsetTimeProvider, TimestampProvider};
 
 pub use config::Config;
 pub use credentials::Credentials;

@@ -15,6 +15,30 @@ PyPI 发布准备见 `docs/zh/release.md`。
 - `Config(credentials, simulated=False, timeout_secs=30, proxy_url=None, rest_url=None, ws_public_url=None, ws_private_url=None)`：客户端配置，底层对应 `okx-core::Config`。
 - 业务类型均来自 Rust `okx-core::types`，经 PyO3 转换后为 Python 对象（如 `Balance`, `Position`, `Order`, `Ticker` 等），字段名保持官方响应命名（camelCase）。
 
+## 异常类型
+SDK 提供分层的异常类型，便于精细化错误处理：
+- `OkxError`：所有 OKX 相关异常的基类
+- `OkxHttpError`：HTTP 响应错误（非 2xx 状态码）
+- `OkxRateLimitError`：HTTP 429 限速错误（继承自 `OkxHttpError`）
+- `OkxApiError`：OKX API 业务错误（code 非 0）
+- `OkxAuthError`：认证错误
+- `OkxWebSocketError`：WebSocket 连接错误
+- `OkxTimeoutError`：请求超时
+
+示例：
+```python
+from okx_py import OkxClient, OkxRateLimitError, OkxApiError
+
+try:
+    client.place_order(...)
+except OkxRateLimitError:
+    # 处理限速，等待后重试
+    time.sleep(1)
+except OkxApiError as e:
+    # 处理业务错误
+    print(f"API 错误: {e}")
+```
+
 ## 同步 REST 客户端 `OkxClient`
 来源：`crates/okx-py/src/client/mod.rs`（绑定入口）与 `crates/okx-py/src/client/*.rs`（按业务域拆分）。所有方法返回 Python 对象/字典列表，与官方 REST 路径一致：
 - `get_balance(ccy=None)` → `/api/v5/account/balance`
@@ -103,8 +127,9 @@ PyPI 发布准备见 `docs/zh/release.md`。
   - `subscribe_account(ccy=None)`（account）
   - `subscribe_positions(inst_type, inst_id=None)`（positions）
   - `subscribe_orders(inst_type, inst_id=None)`（orders）
-- 接收消息：`await client.recv()` 返回 dict（type=data/event/pong/unknown）。实现了 `async for msg in client` 迭代。
+- 接收消息：`await client.recv()` 返回 dict（type=data/event/pong/channel_conn_count/channel_conn_count_error/unknown）。实现了 `async for msg in client` 迭代。
 - 状态控制：`is_connected()`、`reconnect()`、`close()`、`subscription_count()`。
+- 外部时间戳登录：`login_with_timestamp(timestamp_unix)` - 使用服务器同步的时间戳登录私有 WebSocket，解决客户端与服务器时钟偏移问题。
 
 ## WebSocket 已暴露订阅
 | 用途 | 频道 | Python 调用 |
