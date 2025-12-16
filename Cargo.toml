@@ -16,7 +16,7 @@ categories = ["api-bindings", "asynchronous", "web-programming"]
 tokio = { version = "1", features = ["full"] }
 
 # HTTP 客户端
-reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 # WebSocket
 tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
@@ -45,7 +45,7 @@ url = "2"
 
 # Python 绑定 (仅 okx-py 使用)
 # multiple-pymethods: 允许同一 #[pyclass] 有多个 #[pymethods] 块，用于按业务域拆分方法
-pyo3 = { version = "0.27", features = ["extension-module", "multiple-pymethods"] }
+pyo3 = { version = "0.27", features = ["extension-module", "multiple-pymethods", "abi3-py39"] }
 
 # 内部 crates
 okx-core = { path = "crates/okx-core" }
